@@ -1,0 +1,21 @@
+# Unity generated files
+unity_project/[Ll]ibrary/
+unity_project/[Tt]emp/
+unity_project/[Oo]bj/
+unity_project/[Ll]ogs/
+unity_project/[Uu]ser[Ss]ettings/
+unity_project/MemoryCaptures/
+
+# ROS 2 generated files
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# IDE / OS
+.vs/
+.vscode/
+*.csproj
+*.sln
+*.slnx
+.DS_Store
+Thumbs.db

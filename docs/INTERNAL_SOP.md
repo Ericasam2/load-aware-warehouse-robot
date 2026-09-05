@@ -4,7 +4,7 @@
 > 项目：Load-Aware Warehouse Robot  
 > 当前阶段：Milestone 1 — Unity–ROS 2 最小双向通信闭环  
 > 最后维护日期：2026-09-05  
-> 当前状态：已验证 ROS-TCP Endpoint、`/cmd_vel` 和 `/odom` 接口可见
+> 当前状态：已验证 ROS-TCP Endpoint、`/cmd_vel` 和 `/odom` 接口可见；源码已发布至 GitHub
 
 ## 1. 文档目的
 
@@ -728,3 +728,62 @@ ros2 topic info /cmd_vel -v
 - 添加最小测试场景生成工具；
 - 修复 ROS1/ROS2 `HeaderMsg` 和 `TimeMsg` 构造函数差异；
 - 验证 `/UnityEndpoint`、`/cmd_vel_RosSubscriber`、`/odom_RosPublisher` 可见。
+
+### 2026-09-05 — Git 与 GitHub 发布
+
+- 将 `load-aware-warehouse-robot` 初始化为独立 Git 仓库；
+- 默认分支设置为 `main`；
+- 配置 Unity、ROS 2、IDE 和操作系统生成文件忽略规则；
+- 清理公开文档中的本机绝对路径；
+- 检查待提交内容中是否存在 Token、密钥和个人邮箱；
+- 添加 Apache License 2.0；
+- 创建首个提交 `0766fbf`；
+- 创建公开仓库 `Ericasam2/load-aware-warehouse-robot`；
+- 配置 `origin` 并成功推送 `main`；
+- 在 GitHub 页面验证 README、License、文档和源码可见。
+
+---
+
+## 16. Git 与 GitHub SOP
+
+远端仓库：
+
+```text
+https://github.com/Ericasam2/load-aware-warehouse-robot
+```
+
+分支策略：
+
+- 当前开发阶段使用 `main`；
+- 每个可独立验证的功能使用一笔清晰提交；
+- 后续复杂功能可以使用短期 feature branch；
+- 不提交 Unity `Library`、`Temp`、`Logs`、`UserSettings`；
+- 不提交 ROS 2 `build`、`install`、`log`；
+- 不提交公司、客户或真实仓库项目的敏感参数。
+
+日常提交：
+
+```bash
+git status
+git add <changed-files>
+git commit -m "<type>: <verified change>"
+git push origin main
+```
+
+建议提交类型：
+
+```text
+feat: 新功能
+fix: 缺陷修复
+docs: 文档更新
+test: 测试与验证
+refactor: 不改变外部行为的重构
+```
+
+推送前检查：
+
+1. Unity Console 无红色错误；
+2. 运行与本次修改相关的回归验证；
+3. `git status` 中没有缓存、日志或临时文件；
+4. 检查是否包含账号、Token、客户名称和本机绝对路径；
+5. 更新本 SOP 的当前状态、验证证据或变更日志。

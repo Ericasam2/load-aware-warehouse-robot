@@ -60,3 +60,30 @@ ros2 topic echo /odom
 ```
 
 Stopping the `/cmd_vel` publisher should stop the robot within 0.5 seconds.
+
+## Lift position loop
+
+The lift uses a bounded position command (`0.00–0.35 m`) and returns measured
+extension plus an at-target flag.
+
+Build and run the ROS 2 node:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+cd /root/ros2_ws
+colcon build --symlink-install --packages-select warehouse_lift_control
+source install/setup.bash
+ros2 run warehouse_lift_control lift_command_node \
+  --ros-args -p target_height:=0.0
+```
+
+Change the target while the node is running:
+
+```bash
+ros2 param set /lift_command_node target_height 0.25
+ros2 topic echo /lift/state
+ros2 topic echo /lift/at_target
+```
+
+Re-run `Warehouse Robotics > Build Minimal ROS Robot Scene` after pulling this
+milestone so the generated scene contains `LiftColumn` and `LiftPlatform`.

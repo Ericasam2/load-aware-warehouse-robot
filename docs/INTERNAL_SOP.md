@@ -4,7 +4,7 @@
 > 项目：Load-Aware Warehouse Robot  
 > 当前阶段：Milestone 1 — Unity–ROS 2 最小双向通信闭环  
 > 最后维护日期：2026-09-06
-> 当前状态：已验证 ROS-TCP Endpoint、`/cmd_vel` 和 `/odom` 接口可见；源码已发布至 GitHub
+> 当前状态：底盘通信已验证；ROS 2 举升命令与限幅已验证；Unity 举升模型等待场景重建后的最终联调
 
 ## 1. 文档目的
 
@@ -42,11 +42,26 @@ ROS-TCP Endpoint
 ROS 2 /odom
 ```
 
+举升自由度使用独立闭环：
+
+```text
+ROS 2 lift_command_node
+        ↓ /lift/command（目标伸长量）
+Unity RosLiftController
+        ↓ 限速位置运动
+LiftPlatform 高度变化
+        ↓ /lift/state + /lift/at_target
+ROS 2 lift_command_node 到位确认
+```
+
 当前功能包括：
 
 - Unity 订阅 `geometry_msgs/msg/Twist`；
 - 根据线速度和角速度驱动方形机器人；
 - Unity 发布 `nav_msgs/msg/Odometry`；
+- Unity 订阅 `/lift/command` 并控制顶撑高度；
+- Unity 发布 `/lift/state` 和 `/lift/at_target`；
+- ROS 2 `warehouse_lift_control` 节点支持运行时修改目标高度；
 - `/cmd_vel` 超过 0.5 秒未更新时自动停车；
 - Unity/ROS 坐标系转换；
 - 自动生成最小机器人测试场景的 Editor 工具；
@@ -57,7 +72,7 @@ ROS 2 /odom
 
 - 真实左右轮动力学；
 - WheelCollider 或 ArticulationBody 轮组；
-- 顶撑和载货状态；
+- 货物连接、释放和载货状态机；
 - 激光雷达；
 - TF 发布；
 - A*、Pure Pursuit 或 PID；
@@ -325,6 +340,8 @@ Assets/Scenes/MinimalRosRobot.unity
 | Cube | `GameObject > 3D Object > Cube` | 机器人底盘 | 保留 BoxCollider |
 | Cylinder × 2 | `GameObject > 3D Object > Cylinder` | 左右轮视觉模型 | 禁用 |
 | Cube | `GameObject > 3D Object > Cube` | 橙色前向标志 | 禁用 |
+| Cube | `GameObject > 3D Object > Cube` | 举升立柱 | 禁用 |
+| Cube | `GameObject > 3D Object > Cube` | 举升平台 | 保留 BoxCollider |
 | Directional Light | Unity Light | 场景照明 | 不适用 |
 | Camera | Unity Camera | 固定斜上方观察 | 不适用 |
 
@@ -336,7 +353,9 @@ Assets/Materials/GroundMaterial.mat
 Assets/Materials/RobotMaterial.mat
 Assets/Materials/WheelMaterial.mat
 Assets/Materials/ForwardMarkerMaterial.mat
+Assets/Materials/LiftMaterial.mat
 Assets/Scripts/RosDifferentialDrive.cs
+Assets/Scripts/RosLiftController.cs
 Assets/Editor/BuildMinimalRobotScene.cs
 Assets/Resources/ROSConnectionPrefab.prefab
 Assets/Resources/GeometryCompassSettings.asset
@@ -352,9 +371,12 @@ Assets/Resources/GeometryCompassSettings.asset
 MinimalRosRobot
 ├── Ground
 ├── DifferentialRobot
+│   ├── Chassis
 │   ├── LeftWheel
 │   ├── RightWheel
-│   └── ForwardMarker
+│   ├── ForwardMarker
+│   ├── LiftColumn
+│   └── LiftPlatform
 ├── Directional Light
 └── Main Camera
 ```
@@ -362,9 +384,12 @@ MinimalRosRobot
 对象职责：
 
 - `Ground`：提供测试区域和物理接触面；
-- `DifferentialRobot`：机器人根对象，包含底盘 Collider、Rigidbody 和 ROS 控制脚本；
+- `DifferentialRobot`：无缩放的机器人根对象，包含底盘 Collider、Rigidbody 和两个 ROS 控制脚本；
+- `Chassis`：蓝色底盘视觉模型，不承担独立碰撞；
 - `LeftWheel`、`RightWheel`：表示差速结构，当前只随底盘运动；
 - `ForwardMarker`：橙色标志，明确机器人本地 `+Z` 前进方向；
+- `LiftColumn`：黄色固定立柱，只用于显示举升结构；
+- `LiftPlatform`：黄色移动平台，由 `RosLiftController` 沿本地 Y 轴控制；
 - `Directional Light`：提供统一照明；
 - `Main Camera`：以斜上方固定视角观察运动。
 
@@ -390,9 +415,9 @@ Unity 内置 Plane 原始尺寸约为 `10 m × 10 m`，因此 X/Z 缩放为 2 �
 | 属性 | 值 |
 |---|---|
 | Primitive | Cube |
-| Name | `DifferentialRobot` |
-| Position | `(0, 0.30, 0)` |
-| Local Scale | `(0.70, 0.30, 0.90)` |
+| Root | `DifferentialRobot`，空 GameObject，Position `(0,0,0)`、Scale `(1,1,1)` |
+| Visual | `Chassis`，Local Position `(0,0.15,0)` |
+| Chassis Scale | `(0.70, 0.30, 0.90)` |
 | 近似外形 | 宽 0.70 m、高 0.30 m、长 0.90 m |
 | Material | `RobotMaterial` |
 | Color | `(0.10, 0.42, 0.80)`，蓝色 |
@@ -402,34 +427,53 @@ Unity 内置 Plane 原始尺寸约为 `10 m × 10 m`，因此 X/Z 缩放为 2 �
 | Angular Damping | `1.0` |
 | Rotation Constraints | Freeze X、Freeze Z |
 
-底盘中心位于 `y=0.30 m`。当前值以快速联调为目标，不代表真实仓储机器人的精确尺寸。
+根节点保持单位缩放，避免底盘的非均匀缩放影响车轮和举升平台。根节点上的 BoxCollider Center 为 `(0,0.15,0)`、Size 为 `(0.70,0.30,0.90)`。当前数值以快速联调为目标，不代表真实仓储机器人的精确尺寸。
 
 #### 左右轮
 
 | 属性 | LeftWheel | RightWheel |
 |---|---|---|
 | Parent | `DifferentialRobot` | `DifferentialRobot` |
-| Local Position | `(-0.42, -0.10, 0)` | `(0.42, -0.10, 0)` |
+| Local Position | `(-0.39, 0.18, 0)` | `(0.39, 0.18, 0)` |
 | Local Rotation | `(0, 0, 90°)` | `(0, 0, 90°)` |
-| Local Scale | `(0.28, 0.10, 0.28)` | `(0.28, 0.10, 0.28)` |
+| Local Scale | `(0.18, 0.08, 0.18)` | `(0.18, 0.08, 0.18)` |
 | Material | `WheelMaterial` | `WheelMaterial` |
 | Color | `(0.04, 0.04, 0.04)` | `(0.04, 0.04, 0.04)` |
 | Collider | Disabled | Disabled |
 
-轮子是底盘子对象，会继承根对象缩放。因此 Inspector 中显示的是 local scale，不应将其直接解释为最终世界尺寸。后续升级真实轮组时，应将机器人根节点改为空 GameObject，把底盘 Mesh 作为独立子对象，避免非均匀父级缩放影响车轮。
+机器人根节点已经重构为空 GameObject，并保持单位缩放，因此轮子不会再受到 Chassis 非均匀缩放影响。
 
 #### 前向标志
 
 | 属性 | 值 |
 |---|---|
 | Parent | `DifferentialRobot` |
-| Local Position | `(0, 0.28, 0.36)` |
+| Local Position | `(0, 0.36, 0.36)` |
 | Local Scale | `(0.22, 0.10, 0.15)` |
 | Material | `ForwardMarkerMaterial` |
 | Color | `(1.00, 0.55, 0.05)`，橙色 |
 | Collider | Disabled |
 
 橙色块所在方向即 Unity 本地 `+Z`，也对应 ROS 机器人坐标系的 `+x` 前方。
+
+#### 举升机构
+
+| 对象 | Local Position | Local Scale | Collider |
+|---|---|---|---|
+| `LiftColumn` | `(0,0.39,0)` | `(0.16,0.18,0.16)` | Disabled |
+| `LiftPlatform` | 收回位置 `(0,0.52,0)` | `(0.62,0.08,0.72)` | Enabled |
+
+举升参数：
+
+| 参数 | 值 |
+|---|---:|
+| 最小伸长量 | `0.00 m` |
+| 最大伸长量 | `0.35 m` |
+| 运动速度 | `0.15 m/s` |
+| 到位容差 | `0.005 m` |
+| 状态发布频率 | `20 Hz` |
+
+伸长量是相对于收回位置的局部 Y 轴位移，而不是平台的世界坐标高度。例如命令 `0.25 m` 会将平台从 Local Y `0.52` 移动到约 `0.77`。
 
 #### 灯光与摄像机
 
@@ -438,24 +482,26 @@ Unity 内置 Plane 原始尺寸约为 `10 m × 10 m`，因此 X/Z 缩放为 2 �
 | Directional Light | Rotation | `(45°, -30°, 0°)` |
 | Directional Light | Intensity | `1.2` |
 | Main Camera | Position | `(4.5, 5.0, -5.5)` |
-| Main Camera | Look At | `(0, 0.2, 0)` |
+| Main Camera | Look At | `(0, 0.35, 0)` |
 
 ### 6.7 组件与物理配置过程
 
 机器人建模过程：
 
-1. 创建 Cube 作为底盘；
-2. 命名为 `DifferentialRobot`；
-3. 设置位置、缩放和蓝色材质；
-4. 保留 Cube 自动生成的 BoxCollider；
-5. 添加 Rigidbody，并配置质量、阻尼和重力；
-6. 冻结 X/Z 旋转，防止最小模型侧翻或前后翻滚；
-7. 添加 `RosDifferentialDrive`；
-8. 创建两个 Cylinder 作为车轮并设为底盘子对象；
-9. 将 Cylinder 绕 Z 轴旋转 90°，使轮轴方向与底盘横向一致；
-10. 禁用车轮 Collider，避免视觉轮与底盘 Collider 重复接触地面；
-11. 创建橙色 Cube 作为前向标志并禁用 Collider；
-12. 添加固定摄像机和方向光。
+1. 创建空 GameObject 作为机器人根节点并命名为 `DifferentialRobot`；
+2. 在根节点添加 BoxCollider，并设置底盘碰撞尺寸；
+3. 创建 `Chassis` Cube 子对象，设置位置、缩放和蓝色材质，禁用其重复 Collider；
+4. 在根节点添加 Rigidbody，并配置质量、阻尼和重力；
+5. 冻结 X/Z 旋转，防止最小模型侧翻或前后翻滚；
+6. 添加 `RosDifferentialDrive`；
+7. 创建两个 Cylinder 作为车轮并设为底盘子对象；
+8. 将 Cylinder 绕 Z 轴旋转 90°，使轮轴方向与底盘横向一致；
+9. 禁用车轮 Collider，避免视觉轮与底盘 Collider 重复接触地面；
+10. 创建橙色 Cube 作为前向标志并禁用 Collider；
+11. 创建黄色 `LiftColumn` 和 `LiftPlatform`；
+12. 保留 LiftPlatform Collider，禁用 LiftColumn Collider；
+13. 在根节点添加 `RosLiftController` 并绑定 LiftPlatform；
+14. 添加固定摄像机和方向光。
 
 当前 Rigidbody 的实际位移由 `RosDifferentialDrive` 调用 `MovePosition()` 和 `MoveRotation()` 完成。车轮不会根据左右轮角速度独立旋转，也不会通过摩擦力驱动车体。
 
@@ -477,8 +523,11 @@ Ensure Assets/Scenes
   → CreateRobot
       → Rigidbody
       → RosDifferentialDrive
+      → Chassis
       → LeftWheel / RightWheel
       → ForwardMarker
+      → LiftColumn / LiftPlatform
+      → RosLiftController
   → CreateLighting
   → CreateCamera
   → SaveScene
@@ -507,26 +556,30 @@ Assets/Scenes/MinimalRosRobot.unity
 
 1. 新建 Empty Scene；
 2. 创建 Plane，缩放为 `(2,1,2)`，命名 `Ground`；
-3. 创建 Cube，命名 `DifferentialRobot`；
-4. 设置 Position `(0,0.30,0)`、Scale `(0.70,0.30,0.90)`；
-5. 添加 Rigidbody，Mass 40，勾选 Freeze Rotation X/Z；
-6. 添加 `RosDifferentialDrive` 组件；
-7. 在底盘下创建两个 Cylinder，按照 6.6 表格设置左右位置；
-8. 禁用两个 Cylinder 的 Collider；
-9. 创建橙色 Cube 作为 ForwardMarker，禁用 Collider；
-10. 创建 Directional Light 和 Main Camera；
-11. 保存为 `Assets/Scenes/MinimalRosRobot.unity`；
-12. 在 Build Settings 中加入该场景；
-13. 检查机器人橙色标志朝向世界 `+Z`；
-14. Play 后执行第 9 节双向通信验证。
+3. 创建 Empty GameObject，命名 `DifferentialRobot`，保持单位缩放；
+4. 在根节点添加 BoxCollider，Center `(0,0.15,0)`、Size `(0.70,0.30,0.90)`；
+5. 创建 `Chassis` Cube 子对象，Position `(0,0.15,0)`、Scale `(0.70,0.30,0.90)`，禁用其 Collider；
+6. 在根节点添加 Rigidbody，Mass 40，勾选 Freeze Rotation X/Z；
+7. 在根节点添加 `RosDifferentialDrive` 组件；
+8. 在根节点下创建两个 Cylinder，按照 6.6 表格设置左右位置；
+9. 禁用两个 Cylinder 的 Collider；
+10. 创建橙色 Cube 作为 ForwardMarker，禁用 Collider；
+11. 创建 LiftColumn 和 LiftPlatform，并按照 6.6 表格设置参数；
+12. 在根节点添加 `RosLiftController`，将 LiftPlatform 拖入引用字段；
+13. 创建 Directional Light 和 Main Camera；
+14. 保存为 `Assets/Scenes/MinimalRosRobot.unity`；
+15. 在 Build Settings 中加入该场景；
+16. 检查机器人橙色标志朝向世界 `+Z`；
+17. Play 后执行第 9 节和第 17 节双向通信验证。
 
 ### 6.10 当前建模验收标准
 
-- Scene 中能够看到地面、蓝色方形底盘、两只黑色轮子和橙色方向标志；
+- Scene 中能够看到地面、蓝色底盘、两只黑色轮子、橙色方向标志和黄色举升机构；
 - 机器人静止时不会穿过地面或发生明显抖动；
 - 正 `linear.x` 使机器人沿橙色标志方向移动；
 - 正 `angular.z` 符合 ROS 左转约定；
 - 轮子和方向标志不会产生额外物理碰撞；
+- 目标伸长量在 `0–0.35 m` 内时，LiftPlatform 可见地上下运动；
 - 运行过程中 Console 无红色错误；
 - 场景保存后重新打开仍保留对象和组件。
 
@@ -927,6 +980,20 @@ ros2 topic info /cmd_vel -v
 
 ## 15. 变更日志
 
+### 2026-09-06 — Milestone 2 举升自由度最小闭环
+
+- 新增 Unity `RosLiftController`；
+- 新增 `/lift/command`、`/lift/state` 和 `/lift/at_target`；
+- 新增 LiftColumn、LiftPlatform 和 LiftMaterial；
+- 将机器人改为单位缩放空根节点与独立 Chassis 子对象；
+- 将举升范围设置为 `0–0.35 m`，速度设置为 `0.15 m/s`；
+- 新增 ROS 2 Python 包 `warehouse_lift_control`；
+- 支持通过 `target_height` 参数在线修改举升目标；
+- ROS 包在 Jazzy 容器中构建成功；
+- 已验证参数设置为 `0.25 m` 后 `/lift/command` 发布 `data: 0.25`；
+- 已验证 `0.50 m` 非法参数被拒绝，当前目标保持 `0.25 m`；
+- Unity 模型运动和反馈值等待重建场景后进行最终联调验证。
+
 ### 2026-09-06 — 补充 Unity 建模 SOP
 
 - 记录当前建模使用的全部 Unity 内置资源；
@@ -1013,3 +1080,112 @@ refactor: 不改变外部行为的重构
 3. `git status` 中没有缓存、日志或临时文件；
 4. 检查是否包含账号、Token、客户名称和本机绝对路径；
 5. 更新本 SOP 的当前状态、验证证据或变更日志。
+
+---
+
+## 17. 举升高度控制最小闭环
+
+### 17.1 接口定义
+
+| Topic | 类型 | 方向 | 含义 |
+|---|---|---|---|
+| `/lift/command` | `std_msgs/msg/Float32` | ROS 2 → Unity | 目标伸长量，单位 m |
+| `/lift/state` | `std_msgs/msg/Float32` | Unity → ROS 2 | 当前伸长量，单位 m |
+| `/lift/at_target` | `std_msgs/msg/Bool` | Unity → ROS 2 | 是否进入 5 mm 到位容差 |
+
+`/lift/command` 超出 `0–0.35 m` 时，Unity 会将其限制到合法范围。ROS 节点参数回调则会拒绝非法目标值。
+
+### 17.2 Unity 控制过程
+
+`RosLiftController` 收到目标后，在每个 `FixedUpdate()` 中执行：
+
+```text
+current_extension = MoveTowards(
+    current_extension,
+    target_extension,
+    lift_speed × fixed_delta_time)
+```
+
+随后更新：
+
+```text
+LiftPlatform.localPosition = retracted_position + Vector3.up × current_extension
+```
+
+控制器以约 20 Hz 发布当前伸长量和到位标志。目标命令是位置设定值，不需要像速度命令一样周期刷新或超时归零。
+
+### 17.3 ROS 2 控制节点
+
+源码：
+
+```text
+ros2_ws/src/warehouse_lift_control/
+```
+
+构建：
+
+```bash
+source /opt/ros/jazzy/setup.bash
+cd /root/ros2_ws
+colcon build --symlink-install --packages-select warehouse_lift_control
+source install/setup.bash
+```
+
+启动：
+
+```bash
+ros2 run warehouse_lift_control lift_command_node \
+  --ros-args -p target_height:=0.0
+```
+
+运行时升到 0.25 m：
+
+```bash
+ros2 param set /lift_command_node target_height 0.25
+```
+
+降回最低位置：
+
+```bash
+ros2 param set /lift_command_node target_height 0.0
+```
+
+节点会持续发布目标值，并同时订阅 Unity 反馈。当 `/lift/state` 进入容差且 `/lift/at_target=true` 时，日志输出：
+
+```text
+Lift reached 0.250 m (target 0.250 m)
+```
+
+### 17.4 联调验证 SOP
+
+1. 在 Unity 等待编译完成，确认 Console 无红色错误；
+2. 执行 `Warehouse Robotics > Build Minimal ROS Robot Scene`；
+3. 打开重新生成的 `MinimalRosRobot.unity`；
+4. 确认 Hierarchy 中包含 `LiftColumn` 和 `LiftPlatform`；
+5. 点击 Play；
+6. 在 ROS 2 容器启动 `lift_command_node`；
+7. 设置 `target_height=0.25`；
+8. 观察黄色 LiftPlatform 平滑上升；
+9. 检查反馈：
+
+```bash
+ros2 topic echo /lift/state
+ros2 topic echo /lift/at_target
+```
+
+10. 确认 `/lift/state` 从 0 逐步接近 0.25；
+11. 确认到位后 `/lift/at_target` 为 `true`；
+12. 设置 `target_height=0.0`；
+13. 确认平台下降并回传 0 和 `true`。
+
+### 17.5 验收标准
+
+- ROS 2 能在线修改合法目标高度；
+- Unity 平台高度变化清晰可见；
+- 平台运动连续，不发生瞬移；
+- `/lift/state` 与可视运动方向一致；
+- 目标 0.25 m 的最终误差不超过 0.005 m；
+- 到位后 `/lift/at_target=true`；
+- 非法参数（如 0.50 m）被 ROS 节点拒绝；
+- 举升过程中底盘仍可响应 `/cmd_vel`；
+- Unity Console 无红色错误。

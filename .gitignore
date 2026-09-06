@@ -19,3 +19,7 @@ ros2_ws/log/
 *.slnx
 .DS_Store
 Thumbs.db
+
+# Python generated files
+__pycache__/
+*.py[cod]

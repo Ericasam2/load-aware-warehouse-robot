@@ -3,7 +3,7 @@
 > 文档性质：项目内部开发与运维记录  
 > 项目：Load-Aware Warehouse Robot  
 > 当前阶段：Milestone 1 — Unity–ROS 2 最小双向通信闭环  
-> 最后维护日期：2026-09-05  
+> 最后维护日期：2026-09-06
 > 当前状态：已验证 ROS-TCP Endpoint、`/cmd_vel` 和 `/odom` 接口可见；源码已发布至 GitHub
 
 ## 1. 文档目的
@@ -315,7 +315,222 @@ Assets/Scenes/MinimalRosRobot.unity
 
 点击 Play。
 
-### 6.4 已修复的编译兼容问题
+### 6.4 当前建模资源清单
+
+当前最小场景没有下载或使用第三方 3D 模型，全部由 Unity 内置 Primitive 和项目脚本生成。这样可以减少资源导入、比例不一致、许可证和版本兼容问题。
+
+| 资源 | Unity 来源 | 项目用途 | Collider |
+|---|---|---|---|
+| Plane | `GameObject > 3D Object > Plane` | 测试地面 | 保留 MeshCollider |
+| Cube | `GameObject > 3D Object > Cube` | 机器人底盘 | 保留 BoxCollider |
+| Cylinder × 2 | `GameObject > 3D Object > Cylinder` | 左右轮视觉模型 | 禁用 |
+| Cube | `GameObject > 3D Object > Cube` | 橙色前向标志 | 禁用 |
+| Directional Light | Unity Light | 场景照明 | 不适用 |
+| Camera | Unity Camera | 固定斜上方观察 | 不适用 |
+
+相关资源路径：
+
+```text
+Assets/Scenes/MinimalRosRobot.unity
+Assets/Materials/GroundMaterial.mat
+Assets/Materials/RobotMaterial.mat
+Assets/Materials/WheelMaterial.mat
+Assets/Materials/ForwardMarkerMaterial.mat
+Assets/Scripts/RosDifferentialDrive.cs
+Assets/Editor/BuildMinimalRobotScene.cs
+Assets/Resources/ROSConnectionPrefab.prefab
+Assets/Resources/GeometryCompassSettings.asset
+```
+
+`ROSConnectionPrefab.prefab` 和 `GeometryCompassSettings.asset` 由 ROS-TCP Connector 的设置流程生成，保存 ROS 地址、端口和坐标方向配置。它们不是机器人几何模型。
+
+### 6.5 场景层级
+
+运行场景生成器后的核心 Hierarchy：
+
+```text
+MinimalRosRobot
+├── Ground
+├── DifferentialRobot
+│   ├── LeftWheel
+│   ├── RightWheel
+│   └── ForwardMarker
+├── Directional Light
+└── Main Camera
+```
+
+对象职责：
+
+- `Ground`：提供测试区域和物理接触面；
+- `DifferentialRobot`：机器人根对象，包含底盘 Collider、Rigidbody 和 ROS 控制脚本；
+- `LeftWheel`、`RightWheel`：表示差速结构，当前只随底盘运动；
+- `ForwardMarker`：橙色标志，明确机器人本地 `+Z` 前进方向；
+- `Directional Light`：提供统一照明；
+- `Main Camera`：以斜上方固定视角观察运动。
+
+### 6.6 模型尺寸、位置和外观
+
+Unity 场景采用 `1 Unity unit = 1 metre`。
+
+#### 地面
+
+| 属性 | 值 |
+|---|---|
+| Primitive | Plane |
+| Position | `(0, 0, 0)` |
+| Local Scale | `(2, 1, 2)` |
+| 实际覆盖范围 | 约 `20 m × 20 m` |
+| Material | `GroundMaterial` |
+| Color | `(0.18, 0.20, 0.22)`，深灰色 |
+
+Unity 内置 Plane 原始尺寸约为 `10 m × 10 m`，因此 X/Z 缩放为 2 后得到约 20 米见方的测试区域。
+
+#### 机器人底盘
+
+| 属性 | 值 |
+|---|---|
+| Primitive | Cube |
+| Name | `DifferentialRobot` |
+| Position | `(0, 0.30, 0)` |
+| Local Scale | `(0.70, 0.30, 0.90)` |
+| 近似外形 | 宽 0.70 m、高 0.30 m、长 0.90 m |
+| Material | `RobotMaterial` |
+| Color | `(0.10, 0.42, 0.80)`，蓝色 |
+| Mass | `40 kg` |
+| Use Gravity | `true` |
+| Linear Damping | `0.2` |
+| Angular Damping | `1.0` |
+| Rotation Constraints | Freeze X、Freeze Z |
+
+底盘中心位于 `y=0.30 m`。当前值以快速联调为目标，不代表真实仓储机器人的精确尺寸。
+
+#### 左右轮
+
+| 属性 | LeftWheel | RightWheel |
+|---|---|---|
+| Parent | `DifferentialRobot` | `DifferentialRobot` |
+| Local Position | `(-0.42, -0.10, 0)` | `(0.42, -0.10, 0)` |
+| Local Rotation | `(0, 0, 90°)` | `(0, 0, 90°)` |
+| Local Scale | `(0.28, 0.10, 0.28)` | `(0.28, 0.10, 0.28)` |
+| Material | `WheelMaterial` | `WheelMaterial` |
+| Color | `(0.04, 0.04, 0.04)` | `(0.04, 0.04, 0.04)` |
+| Collider | Disabled | Disabled |
+
+轮子是底盘子对象，会继承根对象缩放。因此 Inspector 中显示的是 local scale，不应将其直接解释为最终世界尺寸。后续升级真实轮组时，应将机器人根节点改为空 GameObject，把底盘 Mesh 作为独立子对象，避免非均匀父级缩放影响车轮。
+
+#### 前向标志
+
+| 属性 | 值 |
+|---|---|
+| Parent | `DifferentialRobot` |
+| Local Position | `(0, 0.28, 0.36)` |
+| Local Scale | `(0.22, 0.10, 0.15)` |
+| Material | `ForwardMarkerMaterial` |
+| Color | `(1.00, 0.55, 0.05)`，橙色 |
+| Collider | Disabled |
+
+橙色块所在方向即 Unity 本地 `+Z`，也对应 ROS 机器人坐标系的 `+x` 前方。
+
+#### 灯光与摄像机
+
+| 对象 | 属性 | 值 |
+|---|---|---|
+| Directional Light | Rotation | `(45°, -30°, 0°)` |
+| Directional Light | Intensity | `1.2` |
+| Main Camera | Position | `(4.5, 5.0, -5.5)` |
+| Main Camera | Look At | `(0, 0.2, 0)` |
+
+### 6.7 组件与物理配置过程
+
+机器人建模过程：
+
+1. 创建 Cube 作为底盘；
+2. 命名为 `DifferentialRobot`；
+3. 设置位置、缩放和蓝色材质；
+4. 保留 Cube 自动生成的 BoxCollider；
+5. 添加 Rigidbody，并配置质量、阻尼和重力；
+6. 冻结 X/Z 旋转，防止最小模型侧翻或前后翻滚；
+7. 添加 `RosDifferentialDrive`；
+8. 创建两个 Cylinder 作为车轮并设为底盘子对象；
+9. 将 Cylinder 绕 Z 轴旋转 90°，使轮轴方向与底盘横向一致；
+10. 禁用车轮 Collider，避免视觉轮与底盘 Collider 重复接触地面；
+11. 创建橙色 Cube 作为前向标志并禁用 Collider；
+12. 添加固定摄像机和方向光。
+
+当前 Rigidbody 的实际位移由 `RosDifferentialDrive` 调用 `MovePosition()` 和 `MoveRotation()` 完成。车轮不会根据左右轮角速度独立旋转，也不会通过摩擦力驱动车体。
+
+采用这一实现的原因：
+
+- 当前里程碑首先验证 Unity 与 ROS 2 的双向通信；
+- 避免把 WheelCollider 调参与 TCP、topic、坐标转换问题混在一起；
+- 运动结果确定，便于检查 `/cmd_vel` 符号和 `/odom` 坐标；
+- 后续可在保持 ROS 接口不变的情况下替换底层驱动实现。
+
+### 6.8 自动生成脚本的执行过程
+
+`BuildMinimalRobotScene.BuildScene()` 按以下顺序执行：
+
+```text
+Ensure Assets/Scenes
+  → NewScene
+  → CreateGround
+  → CreateRobot
+      → Rigidbody
+      → RosDifferentialDrive
+      → LeftWheel / RightWheel
+      → ForwardMarker
+  → CreateLighting
+  → CreateCamera
+  → SaveScene
+  → Add scene to EditorBuildSettings
+  → Select DifferentialRobot
+```
+
+材质通过 `CreateMaterial()` 创建：
+
+1. 优先查找 `Universal Render Pipeline/Lit`；
+2. 如果不存在，则使用 `Standard`；
+3. 如果同名 `.mat` 已存在，则复用现有材质；
+4. 如果不存在，则创建材质资产并保存到 `Assets/Materials`。
+
+场景保存到固定路径：
+
+```text
+Assets/Scenes/MinimalRosRobot.unity
+```
+
+重要：再次运行该菜单会创建一个新的空场景并覆盖同一路径。对该场景进行重要手工修改前，应先提交 Git，或复制为新场景。正式仓库建模阶段应创建新的 `Warehouse.unity`，不要继续覆盖最小联调场景。
+
+### 6.9 手动复现建模步骤
+
+如果 Editor 脚本不可用，可在 Unity 中手动复现：
+
+1. 新建 Empty Scene；
+2. 创建 Plane，缩放为 `(2,1,2)`，命名 `Ground`；
+3. 创建 Cube，命名 `DifferentialRobot`；
+4. 设置 Position `(0,0.30,0)`、Scale `(0.70,0.30,0.90)`；
+5. 添加 Rigidbody，Mass 40，勾选 Freeze Rotation X/Z；
+6. 添加 `RosDifferentialDrive` 组件；
+7. 在底盘下创建两个 Cylinder，按照 6.6 表格设置左右位置；
+8. 禁用两个 Cylinder 的 Collider；
+9. 创建橙色 Cube 作为 ForwardMarker，禁用 Collider；
+10. 创建 Directional Light 和 Main Camera；
+11. 保存为 `Assets/Scenes/MinimalRosRobot.unity`；
+12. 在 Build Settings 中加入该场景；
+13. 检查机器人橙色标志朝向世界 `+Z`；
+14. Play 后执行第 9 节双向通信验证。
+
+### 6.10 当前建模验收标准
+
+- Scene 中能够看到地面、蓝色方形底盘、两只黑色轮子和橙色方向标志；
+- 机器人静止时不会穿过地面或发生明显抖动；
+- 正 `linear.x` 使机器人沿橙色标志方向移动；
+- 正 `angular.z` 符合 ROS 左转约定；
+- 轮子和方向标志不会产生额外物理碰撞；
+- 运行过程中 Console 无红色错误；
+- 场景保存后重新打开仍保留对象和组件。
+
+### 6.11 已修复的编译兼容问题
 
 首次导入时项目仍处于默认 ROS1 编译分支，出现：
 
@@ -711,6 +926,17 @@ ros2 topic info /cmd_vel -v
 ---
 
 ## 15. 变更日志
+
+### 2026-09-06 — 补充 Unity 建模 SOP
+
+- 记录当前建模使用的全部 Unity 内置资源；
+- 记录场景 Hierarchy、对象命名和资源路径；
+- 记录地面、底盘、轮子、前向标志、灯光和摄像机参数；
+- 记录 Collider、Rigidbody、质量、阻尼和旋转约束；
+- 说明运动学底盘方案的选择原因和当前限制；
+- 记录自动场景生成器的内部执行顺序；
+- 补充不依赖 Editor 脚本的手动复现流程；
+- 增加场景覆盖风险提示和建模验收标准。
 
 ### 2026-09-05 — Milestone 1 基础搭建
 

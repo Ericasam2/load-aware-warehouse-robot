@@ -40,6 +40,17 @@ targets and applies torque through two Unity `WheelCollider` components. Robot
 motion therefore comes from wheel contact and Rigidbody physics; `/odom` reports
 the measured Rigidbody velocity rather than echoing the command.
 
+Measured wheel position and angular velocity are published at approximately
+20 Hz using the standard `sensor_msgs/msg/JointState` interface:
+
+```bash
+ros2 topic echo /joint_states
+ros2 topic echo /joint_states --field velocity
+```
+
+The `effort` array is intentionally empty, and simulated slip/contact values are
+not published as robot sensor feedback.
+
 ### Send a velocity command
 
 Open a shell in the container:

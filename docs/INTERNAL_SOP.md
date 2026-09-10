@@ -4,7 +4,7 @@
 > 项目：Load-Aware Warehouse Robot  
 > 当前阶段：Milestone 3 — 物理差速轮模型
 > 最后维护日期：2026-09-10
-> 当前状态：物理差速轮代码与场景升级工具已实现并通过编译；当前场景仍需执行升级菜单并完成 Play Mode 动力学联调
+> 当前状态：物理差速轮与 `/joint_states` 轮速反馈代码已实现并通过编译；当前场景仍需执行升级菜单并完成 Play Mode 联调
 
 ## 1. 文档目的
 
@@ -63,6 +63,7 @@ ROS 2 lift_command_node 到位确认
 - 通过两个 `WheelCollider` 的电机扭矩驱动方形机器人；
 - 车轮视觉模型跟随物理轮位置和转角；
 - Unity 发布 `nav_msgs/msg/Odometry`；
+- Unity 以标准 `sensor_msgs/msg/JointState` 发布左右轮编码器位置和实测轮速；
 - Unity 订阅 `/lift/command` 并控制顶撑高度；
 - Unity 发布 `/lift/state` 和 `/lift/at_target`；
 - ROS 2 `warehouse_lift_control` 节点支持运行时修改目标高度；
@@ -723,7 +724,9 @@ ROS 正 `angular.z` 对应 Unity 负 Y 轴旋转。
 
 ---
 
-## 8. 里程计实现
+## 8. 里程计与轮编码器反馈
+
+### 8.1 车体里程计
 
 输出接口：
 
@@ -744,6 +747,24 @@ Child frame: base_link
 - 时间同步误差。
 
 这符合当前项目“已知地图、无需定位感知”的范围。
+
+### 8.2 左右轮状态
+
+```text
+Topic: /joint_states
+Type: sensor_msgs/msg/JointState
+Rate: approximately 20 Hz
+Frame: base_link
+Joint names: left_wheel_joint, right_wheel_joint
+```
+
+数据来源：
+
+- `velocity`：直接由 `WheelCollider.rpm × 2π / 60` 得到，单位 `rad/s`；
+- `position`：对每个物理步长的实测角速度积分，单位 `rad`；
+- `effort`：保持空数组，因为当前 Unity 电机扭矩是仿真控制量，不作为真实机器人传感器反馈。
+
+当前不发布 WheelCollider 的 `forwardSlip`、`sidewaysSlip` 或接触力。这些量虽然仿真可以读取，但大多数实际移动机器人不能直接测得，不进入本项目的常规状态闭环。
 
 ---
 
@@ -783,6 +804,7 @@ Unity 进入 Play 后预期包含：
 ```text
 /cmd_vel
 /odom
+/joint_states
 ```
 
 更详细检查：
@@ -790,12 +812,14 @@ Unity 进入 Play 后预期包含：
 ```bash
 ros2 topic info /cmd_vel -v
 ros2 topic info /odom -v
+ros2 topic info /joint_states -v
 ```
 
 预期：
 
 - `/cmd_vel` 至少有一个 Unity subscriber；
-- `/odom` 至少有一个 Unity publisher。
+- `/odom` 至少有一个 Unity publisher；
+- `/joint_states` 至少有一个 Unity publisher。
 
 ### 9.4 测试 ROS 2 → Unity
 
@@ -832,6 +856,12 @@ source /root/ros2_ws/install/setup.bash
 ros2 topic echo /odom
 ```
 
+轮速监控：
+
+```bash
+ros2 topic echo /joint_states
+```
+
 预期：
 
 - 直行时 `pose.pose.position.x/y` 变化；
@@ -840,13 +870,22 @@ ros2 topic echo /odom
 - `twist.twist.angular.z` 从零逐步接近转向命令；
 - 打滑、加速和制动期间，实测 twist 允许与命令存在差异。
 
+`/joint_states` 预期：
+
+- `name` 固定为 `left_wheel_joint`、`right_wheel_joint`；
+- 直行时两轮 `velocity` 同号且数值接近；
+- 原地转向时两轮 `velocity` 异号；
+- 停止后两轮 `velocity` 接近 0；
+- `effort` 为空，不把 Unity 仿真扭矩伪装成机器人实测量。
+
 检查频率：
 
 ```bash
 ros2 topic hz /odom
+ros2 topic hz /joint_states
 ```
 
-预期约为 20 Hz。
+两者预期均约为 20 Hz。
 
 ### 9.6 当前已获得的验证证据
 
@@ -1031,8 +1070,9 @@ ros2 param set /lift_command_node target_height 0.25
 6. 两个 WheelCollider 均接触地面，视觉轮滚动方向正确；
 7. 停止发布 0.5 秒后进入制动且约 1 秒内接近静止；
 8. `/odom` twist 来源于刚体实测速度，运动初期具有合理加速过程；
-9. `/odom` 频率接近配置值；
-10. Unity Console 无红色错误。
+9. `/joint_states` 的左右轮名称、速度符号与运动模式一致；
+10. `/odom` 和 `/joint_states` 频率接近配置值；
+11. Unity Console 无红色错误。
 
 禁止在未完成上述验证时将状态标记为“已完成”。
 
@@ -1074,6 +1114,16 @@ ros2 param set /lift_command_node target_height 0.25
 ---
 
 ## 15. 变更日志
+
+### 2026-09-10 — 增加实际轮速监控
+
+- 新增标准 `/joint_states`，类型为 `sensor_msgs/msg/JointState`；
+- 发布左右轮累计角位置和由 WheelCollider `rpm` 得到的实测角速度；
+- 发布频率默认为 20 Hz，joint 名称为 `left_wheel_joint` 和 `right_wheel_joint`；
+- `effort` 保持空数组，不将 Unity 控制扭矩当作真实传感器反馈；
+- 明确不发布打滑与接触力，保持与实际机器人常规可观测量一致；
+- Unity 运行程序集编译通过，`0 warnings / 0 errors`；
+- ROS topic 注册和数值等待场景升级后进行 Play Mode 验证。
 
 ### 2026-09-10 — Milestone 3 物理差速轮实现
 
@@ -1348,3 +1398,26 @@ ros2 topic pub --rate 10 /cmd_vel geometry_msgs/msg/Twist \
 - 运行中查看两个 WheelCollider 的 `Is Grounded` 均为 true。
 
 若轮子空转但机器人不移动，先检查 WheelCollider 是否接地以及 Ground 是否保留 Collider；若转向方向相反，先核对左右轮引用是否互换，再检查第 7.5 节坐标约定。只有完成以上 Play Mode 验证后，才能将 Milestone 3 标记为已完成。
+
+### 18.5 轮速监控
+
+Unity 进入 Play 后确认 topic：
+
+```bash
+ros2 topic info /joint_states -v
+ros2 topic hz /joint_states
+```
+
+查看左右轮累计角位置和当前角速度：
+
+```bash
+ros2 topic echo /joint_states
+```
+
+只查看轮速数组：
+
+```bash
+ros2 topic echo /joint_states --field velocity
+```
+
+直行时两项速度应同号，原地转向时应异号，停车后均应接近 0。该 topic 不包含打滑、接触力或仿真控制扭矩。

@@ -1,6 +1,7 @@
 using RosMessageTypes.BuiltinInterfaces;
 using RosMessageTypes.Geometry;
 using RosMessageTypes.Nav;
+using RosMessageTypes.Sensor;
 using RosMessageTypes.Std;
 using Unity.Robotics.ROSTCPConnector;
 using UnityEngine;
@@ -35,6 +36,12 @@ namespace WarehouseRobot
         [SerializeField] private string cmdVelTopic = "/cmd_vel";
         [SerializeField] private string odomTopic = "/odom";
 
+        [Header("Wheel encoder feedback")]
+        [SerializeField] private string jointStatesTopic = "/joint_states";
+        [SerializeField] private string leftWheelJointName = "left_wheel_joint";
+        [SerializeField] private string rightWheelJointName = "right_wheel_joint";
+        [SerializeField] private float jointStatePublishRateHz = 20.0f;
+
         [Header("Motion limits")]
         [SerializeField] private float maxLinearSpeed = 1.0f;
         [SerializeField] private float maxAngularSpeed = 1.5f;
@@ -54,6 +61,9 @@ namespace WarehouseRobot
         private float commandedAngular;
         private float lastCommandTime = float.NegativeInfinity;
         private float nextOdomPublishTime;
+        private float nextJointStatePublishTime;
+        private double leftWheelPosition;
+        private double rightWheelPosition;
         private Vector3 startPosition;
         private Quaternion startRotation;
 
@@ -108,6 +118,7 @@ namespace WarehouseRobot
             ros = ROSConnection.GetOrCreateInstance();
             ros.Subscribe<TwistMsg>(cmdVelTopic, ReceiveVelocityCommand);
             ros.RegisterPublisher<OdometryMsg>(odomTopic);
+            ros.RegisterPublisher<JointStateMsg>(jointStatesTopic);
         }
 
         private void ReceiveVelocityCommand(TwistMsg message)
@@ -127,11 +138,24 @@ namespace WarehouseRobot
             float halfTrack = trackWidth * 0.5f;
             float leftTargetAngularSpeed = (linear - angular * halfTrack) / wheelRadius;
             float rightTargetAngularSpeed = (linear + angular * halfTrack) / wheelRadius;
+            float leftMeasuredAngularSpeed = GetWheelAngularSpeed(leftWheelCollider);
+            float rightMeasuredAngularSpeed = GetWheelAngularSpeed(rightWheelCollider);
 
-            DriveWheel(leftWheelCollider, leftTargetAngularSpeed);
-            DriveWheel(rightWheelCollider, rightTargetAngularSpeed);
+            DriveWheel(leftWheelCollider, leftTargetAngularSpeed, leftMeasuredAngularSpeed);
+            DriveWheel(rightWheelCollider, rightTargetAngularSpeed, rightMeasuredAngularSpeed);
             UpdateWheelVisual(leftWheelCollider, leftWheelVisual);
             UpdateWheelVisual(rightWheelCollider, rightWheelVisual);
+
+            float dt = Time.fixedDeltaTime;
+            leftWheelPosition += leftMeasuredAngularSpeed * dt;
+            rightWheelPosition += rightMeasuredAngularSpeed * dt;
+
+            if (Time.time >= nextJointStatePublishTime)
+            {
+                PublishJointStates(leftMeasuredAngularSpeed, rightMeasuredAngularSpeed);
+                nextJointStatePublishTime =
+                    Time.time + 1.0f / Mathf.Max(1.0f, jointStatePublishRateHz);
+            }
 
             if (Time.time >= nextOdomPublishTime)
             {
@@ -140,7 +164,15 @@ namespace WarehouseRobot
             }
         }
 
-        private void DriveWheel(WheelCollider wheel, float targetAngularSpeed)
+        private static float GetWheelAngularSpeed(WheelCollider wheel)
+        {
+            return wheel.rpm * 2.0f * Mathf.PI / 60.0f;
+        }
+
+        private void DriveWheel(
+            WheelCollider wheel,
+            float targetAngularSpeed,
+            float measuredAngularSpeed)
         {
             if (Mathf.Abs(targetAngularSpeed) <= stoppedSpeedTolerance)
             {
@@ -149,7 +181,6 @@ namespace WarehouseRobot
                 return;
             }
 
-            float measuredAngularSpeed = wheel.rpm * 2.0f * Mathf.PI / 60.0f;
             float speedError = targetAngularSpeed - measuredAngularSpeed;
             wheel.brakeTorque = 0.0f;
             wheel.motorTorque = Mathf.Clamp(
@@ -253,6 +284,33 @@ namespace WarehouseRobot
             ros.Publish(odomTopic, message);
         }
 
+        private void PublishJointStates(
+            float leftAngularSpeed,
+            float rightAngularSpeed)
+        {
+            var message = new JointStateMsg(
+                CreateHeader(baseFrame),
+                new[] { leftWheelJointName, rightWheelJointName },
+                new[] { leftWheelPosition, rightWheelPosition },
+                new[] { (double)leftAngularSpeed, (double)rightAngularSpeed },
+                new double[0]);
+
+            ros.Publish(jointStatesTopic, message);
+        }
+
+        private HeaderMsg CreateHeader(string frameId)
+        {
+            double now = Time.realtimeSinceStartupAsDouble;
+            int seconds = (int)now;
+            uint nanoseconds = (uint)((now - seconds) * 1_000_000_000.0);
+
+#if ROS2
+            return new HeaderMsg(new TimeMsg(seconds, nanoseconds), frameId);
+#else
+            return new HeaderMsg(0u, new TimeMsg((uint)seconds, nanoseconds), frameId);
+#endif
+        }
+
         private void OnDisable()
         {
             StopWheel(leftWheelCollider);
@@ -282,6 +340,7 @@ namespace WarehouseRobot
             maxAngularSpeed = Mathf.Max(0.0f, maxAngularSpeed);
             commandTimeoutSeconds = Mathf.Max(0.01f, commandTimeoutSeconds);
             odomPublishRateHz = Mathf.Max(1.0f, odomPublishRateHz);
+            jointStatePublishRateHz = Mathf.Max(1.0f, jointStatePublishRateHz);
         }
     }
 }

@@ -2,9 +2,9 @@
 
 > 文档性质：项目内部开发与运维记录  
 > 项目：Load-Aware Warehouse Robot  
-> 当前阶段：Milestone 1 — Unity–ROS 2 最小双向通信闭环  
-> 最后维护日期：2026-09-06
-> 当前状态：底盘通信已验证；ROS 2 举升命令与限幅已验证；Unity 举升模型等待场景重建后的最终联调
+> 当前阶段：Milestone 2 — ROS 2 控制举升自由度最小闭环
+> 最后维护日期：2026-09-10
+> 当前状态：底盘通信已验证；ROS 2 举升节点、命令话题和 Unity 接口已验证；Unity 举升运动与反馈仍需在 Play 状态下完成最终联调
 
 ## 1. 文档目的
 
@@ -834,7 +834,8 @@ Topics: /cmd_vel, /odom
 4. 打开 Unity 工程；
 5. 检查 ROS Settings；
 6. 打开场景并 Play；
-7. 使用 `ros2 topic list` 验证。
+7. 启动 `lift_command_node`；
+8. 使用 `ros2 node list` 和 `ros2 topic list` 验证。
 
 启动容器：
 
@@ -849,6 +850,21 @@ ros2 node list | grep UnityEndpoint
 ```
 
 如果不存在，再启动 Endpoint。
+
+升降命令节点不是容器服务，执行 `docker stop`、重启容器或结束节点进程后不会自动恢复。每次需要控制顶撑时，在独立终端启动：
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source /root/ros2_ws/install/setup.bash
+ros2 run warehouse_lift_control lift_command_node \
+  --ros-args -p target_height:=0.0
+```
+
+保持该终端运行，再从另一个已经 source 环境的容器终端执行 `ros2 param set`。启动后先确认：
+
+```bash
+ros2 node list | grep lift_command_node
+```
 
 ### 10.2 开发结束
 
@@ -925,6 +941,31 @@ ros2 topic info /cmd_vel -v
 
 这是 Unity 6 的黄色弃用提示，不影响当前功能，不作为阻塞问题处理。
 
+### 11.8 `ros2 param set` 返回 `Node not found`
+
+报错示例：
+
+```text
+ros2 param set /lift_command_node target_height 0.25
+Node not found
+```
+
+这表示参数目标节点没有运行，不代表 Unity–ROS TCP 断开。先检查：
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source /root/ros2_ws/install/setup.bash
+ros2 node list | grep lift_command_node
+```
+
+如果没有输出，按 10.1 或 17.3 启动 `lift_command_node`，保持启动终端运行，然后在第二个终端重新执行：
+
+```bash
+ros2 param set /lift_command_node target_height 0.25
+```
+
+成功时返回 `Set parameter successful`。若参数成功但 `/lift/state` 没有数据，检查 Unity 是否仍处于 Play；Unity 注册话题后退出或暂停 Play 时，ROS graph 可能暂时仍能看到端点，但不会产生逐帧反馈。
+
 ---
 
 ## 12. 修改与回归验证规则
@@ -979,6 +1020,15 @@ ros2 topic info /cmd_vel -v
 ---
 
 ## 15. 变更日志
+
+### 2026-09-10 — 补充举升节点启动与 `Node not found` 排障
+
+- 实测容器重启后 `/lift_command_node` 不会自动启动；
+- 在节点缺失时复现 `ros2 param set ...` 返回 `Node not found`；
+- 启动 `warehouse_lift_control/lift_command_node` 后确认节点可见；
+- 确认 `target_height=0.25` 返回 `Set parameter successful`；
+- 确认 `/lift/command` 与 Unity subscriber 匹配，`/lift/state`、`/lift/at_target` 与 ROS 节点 subscription 匹配；
+- 将命令节点加入每日启动步骤，并补充 Unity 非 Play 时无反馈的判定方法。
 
 ### 2026-09-06 — Milestone 2 举升自由度最小闭环
 

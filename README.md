@@ -1,12 +1,12 @@
 # Load-Aware Warehouse Robot
 
-Unity–ROS 2 warehouse robotics demonstrator. The first milestone is a minimal
-ROS-controlled differential-drive robot.
+Unity–ROS 2 warehouse robotics demonstrator with a ROS-controlled lift and a
+two-wheel physical differential-drive base.
 
 Internal setup, implementation, verification, and troubleshooting procedures:
 [docs/INTERNAL_SOP.md](docs/INTERNAL_SOP.md).
 
-## Current milestone: Unity ↔ ROS 2 smoke test
+## Current milestone: physical differential-drive integration
 
 ### ROS side
 
@@ -30,8 +30,15 @@ The endpoint is exposed to Windows at `127.0.0.1:10000`.
 2. Wait for Package Manager and script compilation to finish.
 3. Open `Robotics > ROS Settings`.
 4. Set the protocol to `ROS2`, IP to `127.0.0.1`, and port to `10000`.
-5. Select `Warehouse Robotics > Build Minimal ROS Robot Scene`.
+5. For a new scene, select `Warehouse Robotics > Build Minimal ROS Robot Scene`.
+   For the existing lift scene, select
+   `Warehouse Robotics > Upgrade Current Robot To Physical Wheels` and save it.
 6. Open `Assets/Scenes/MinimalRosRobot.unity` and press Play.
+
+The drive controller converts `/cmd_vel` into left/right wheel angular-speed
+targets and applies torque through two Unity `WheelCollider` components. Robot
+motion therefore comes from wheel contact and Rigidbody physics; `/odom` reports
+the measured Rigidbody velocity rather than echoing the command.
 
 ### Send a velocity command
 
@@ -59,7 +66,8 @@ source /root/ros2_ws/install/setup.bash
 ros2 topic echo /odom
 ```
 
-Stopping the `/cmd_vel` publisher should stop the robot within 0.5 seconds.
+Stopping the `/cmd_vel` publisher triggers braking after the 0.5-second command
+timeout; the robot should be nearly stationary within about one second.
 
 ## Lift position loop
 

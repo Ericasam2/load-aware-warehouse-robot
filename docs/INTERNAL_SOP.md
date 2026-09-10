@@ -2,9 +2,9 @@
 
 > 文档性质：项目内部开发与运维记录  
 > 项目：Load-Aware Warehouse Robot  
-> 当前阶段：Milestone 2 — ROS 2 控制举升自由度最小闭环
+> 当前阶段：Milestone 3 — 物理差速轮模型
 > 最后维护日期：2026-09-10
-> 当前状态：底盘通信已验证；ROS 2 举升节点、命令话题和 Unity 接口已验证；Unity 举升运动与反馈仍需在 Play 状态下完成最终联调
+> 当前状态：物理差速轮代码与场景升级工具已实现并通过编译；当前场景仍需执行升级菜单并完成 Play Mode 动力学联调
 
 ## 1. 文档目的
 
@@ -32,8 +32,10 @@ ROS-TCP Endpoint（Docker，端口 10000）
 Unity ROSConnection
         ↓
 RosDifferentialDrive
-        ↓
-Unity Rigidbody 运动
+        ↓ 差速逆运动学
+左右 WheelCollider 轮速闭环
+        ↓ 电机扭矩、轮地摩擦与制动
+Unity Rigidbody 物理运动
         ↓
 Unity /odom
         ↓
@@ -57,7 +59,9 @@ ROS 2 lift_command_node 到位确认
 当前功能包括：
 
 - Unity 订阅 `geometry_msgs/msg/Twist`；
-- 根据线速度和角速度驱动方形机器人；
+- 将线速度和角速度换算为左右轮目标角速度；
+- 通过两个 `WheelCollider` 的电机扭矩驱动方形机器人；
+- 车轮视觉模型跟随物理轮位置和转角；
 - Unity 发布 `nav_msgs/msg/Odometry`；
 - Unity 订阅 `/lift/command` 并控制顶撑高度；
 - Unity 发布 `/lift/state` 和 `/lift/at_target`；
@@ -70,8 +74,8 @@ ROS 2 lift_command_node 到位确认
 
 当前不包括：
 
-- 真实左右轮动力学；
-- WheelCollider 或 ArticulationBody 轮组；
+- 独立 `ArticulationBody` 轮轴与电机动力学；
+- 编码器噪声、打滑里程计和轮胎参数标定；
 - 货物连接、释放和载货状态机；
 - 激光雷达；
 - TF 发布；
@@ -170,9 +174,12 @@ ros2_ws/
 - 订阅 `/cmd_vel`；
 - 限制最大线速度和角速度；
 - 检测命令超时；
-- 在 `FixedUpdate()` 中更新 Rigidbody；
+- 执行差速逆运动学，计算左右轮目标角速度；
+- 根据 `WheelCollider.rpm` 做比例轮速控制并施加电机扭矩；
+- 静止或命令超时时施加保持制动；
+- 使用 `GetWorldPose()` 同步左右轮视觉模型；
 - 将 Unity 位姿转换为 ROS 坐标；
-- 以约 20 Hz 发布 `/odom`。
+- 以约 20 Hz 发布刚体实测 `/odom`。
 
 #### `BuildMinimalRobotScene.cs`
 
@@ -186,14 +193,20 @@ Warehouse Robotics > Build Minimal ROS Robot Scene
 
 - 地面；
 - 方形机器人底盘；
-- 左右轮视觉模型；
+- 左右轮视觉模型和两个物理 `WheelCollider`；
 - 前向方向标志；
 - Rigidbody；
 - `RosDifferentialDrive`；
 - 摄像机和灯光；
 - `Assets/Scenes/MinimalRosRobot.unity`。
 
-车轮当前仅用于视觉显示，不参与动力学计算。
+若当前场景已经包含举升结构或其他手工编辑，不希望整场重建，可使用：
+
+```text
+Warehouse Robotics > Upgrade Current Robot To Physical Wheels
+```
+
+该菜单只升级活动场景中的 `DifferentialRobot`，添加或复用左右 `WheelCollider`，调整底盘离地高度并绑定控制器，不会新建场景。
 
 ---
 
@@ -337,8 +350,9 @@ Assets/Scenes/MinimalRosRobot.unity
 | 资源 | Unity 来源 | 项目用途 | Collider |
 |---|---|---|---|
 | Plane | `GameObject > 3D Object > Plane` | 测试地面 | 保留 MeshCollider |
-| Cube | `GameObject > 3D Object > Cube` | 机器人底盘 | 保留 BoxCollider |
+| Cube | `GameObject > 3D Object > Cube` | 机器人底盘视觉 | 子对象 Collider 禁用，根节点保留 BoxCollider |
 | Cylinder × 2 | `GameObject > 3D Object > Cylinder` | 左右轮视觉模型 | 禁用 |
+| WheelCollider × 2 | Unity Physics | 左右驱动轮接触、悬架和摩擦 | 启用 |
 | Cube | `GameObject > 3D Object > Cube` | 橙色前向标志 | 禁用 |
 | Cube | `GameObject > 3D Object > Cube` | 举升立柱 | 禁用 |
 | Cube | `GameObject > 3D Object > Cube` | 举升平台 | 保留 BoxCollider |
@@ -374,6 +388,8 @@ MinimalRosRobot
 │   ├── Chassis
 │   ├── LeftWheel
 │   ├── RightWheel
+│   ├── LeftWheelCollider
+│   ├── RightWheelCollider
 │   ├── ForwardMarker
 │   ├── LiftColumn
 │   └── LiftPlatform
@@ -386,7 +402,8 @@ MinimalRosRobot
 - `Ground`：提供测试区域和物理接触面；
 - `DifferentialRobot`：无缩放的机器人根对象，包含底盘 Collider、Rigidbody 和两个 ROS 控制脚本；
 - `Chassis`：蓝色底盘视觉模型，不承担独立碰撞；
-- `LeftWheel`、`RightWheel`：表示差速结构，当前只随底盘运动；
+- `LeftWheel`、`RightWheel`：左右轮视觉模型，通过 `GetWorldPose()` 跟随物理轮滚动；
+- `LeftWheelCollider`、`RightWheelCollider`：实际接触地面并接受电机扭矩的物理驱动轮；
 - `ForwardMarker`：橙色标志，明确机器人本地 `+Z` 前进方向；
 - `LiftColumn`：黄色固定立柱，只用于显示举升结构；
 - `LiftPlatform`：黄色移动平台，由 `RosLiftController` 沿本地 Y 轴控制；
@@ -416,39 +433,53 @@ Unity 内置 Plane 原始尺寸约为 `10 m × 10 m`，因此 X/Z 缩放为 2 �
 |---|---|
 | Primitive | Cube |
 | Root | `DifferentialRobot`，空 GameObject，Position `(0,0,0)`、Scale `(1,1,1)` |
-| Visual | `Chassis`，Local Position `(0,0.15,0)` |
-| Chassis Scale | `(0.70, 0.30, 0.90)` |
-| 近似外形 | 宽 0.70 m、高 0.30 m、长 0.90 m |
+| Visual | `Chassis`，Local Position `(0,0.32,0)` |
+| Chassis Scale | `(0.70, 0.28, 0.90)` |
+| 近似外形 | 宽 0.70 m、高 0.28 m、长 0.90 m |
 | Material | `RobotMaterial` |
 | Color | `(0.10, 0.42, 0.80)`，蓝色 |
 | Mass | `40 kg` |
 | Use Gravity | `true` |
-| Linear Damping | `0.2` |
-| Angular Damping | `1.0` |
+| Center Of Mass | `(0,0.24,0)` |
+| Linear Damping | `0.1` |
+| Angular Damping | `0.5` |
 | Rotation Constraints | Freeze X、Freeze Z |
 
-根节点保持单位缩放，避免底盘的非均匀缩放影响车轮和举升平台。根节点上的 BoxCollider Center 为 `(0,0.15,0)`、Size 为 `(0.70,0.30,0.90)`。当前数值以快速联调为目标，不代表真实仓储机器人的精确尺寸。
+根节点保持单位缩放，避免底盘的非均匀缩放影响车轮和举升平台。根节点上的 BoxCollider Center 为 `(0,0.32,0)`、Size 为 `(0.70,0.28,0.90)`，底面高于轮地接触点。X/Z 旋转冻结用于代替当前最小模型尚未加入的万向轮支撑。
 
 #### 左右轮
 
 | 属性 | LeftWheel | RightWheel |
 |---|---|---|
 | Parent | `DifferentialRobot` | `DifferentialRobot` |
-| Local Position | `(-0.39, 0.18, 0)` | `(0.39, 0.18, 0)` |
+| Local Position | `(-0.39, 0.22, 0)` | `(0.39, 0.22, 0)` |
 | Local Rotation | `(0, 0, 90°)` | `(0, 0, 90°)` |
 | Local Scale | `(0.18, 0.08, 0.18)` | `(0.18, 0.08, 0.18)` |
 | Material | `WheelMaterial` | `WheelMaterial` |
 | Color | `(0.04, 0.04, 0.04)` | `(0.04, 0.04, 0.04)` |
 | Collider | Disabled | Disabled |
 
-机器人根节点已经重构为空 GameObject，并保持单位缩放，因此轮子不会再受到 Chassis 非均匀缩放影响。
+视觉轮的 Collider 保持禁用，避免与物理轮重复接触。对应的 `LeftWheelCollider` 和 `RightWheelCollider` 位于同一局部坐标，半径为 `0.18 m`，轮距为 `0.78 m`，悬架行程为 `0.05 m`。
+
+物理参数：
+
+| 参数 | 值 |
+|---|---|
+| Wheel mass | `2 kg` |
+| Wheel damping rate | `0.5` |
+| Suspension spring | `8000` |
+| Suspension damper | `1000` |
+| Forward friction stiffness | `1.5` |
+| Sideways friction stiffness | `2.0` |
+| Maximum motor torque | `45 N·m` |
+| Holding brake torque | `80 N·m` |
 
 #### 前向标志
 
 | 属性 | 值 |
 |---|---|
 | Parent | `DifferentialRobot` |
-| Local Position | `(0, 0.36, 0.36)` |
+| Local Position | `(0, 0.52, 0.36)` |
 | Local Scale | `(0.22, 0.10, 0.15)` |
 | Material | `ForwardMarkerMaterial` |
 | Color | `(1.00, 0.55, 0.05)`，橙色 |
@@ -460,8 +491,8 @@ Unity 内置 Plane 原始尺寸约为 `10 m × 10 m`，因此 X/Z 缩放为 2 �
 
 | 对象 | Local Position | Local Scale | Collider |
 |---|---|---|---|
-| `LiftColumn` | `(0,0.39,0)` | `(0.16,0.18,0.16)` | Disabled |
-| `LiftPlatform` | 收回位置 `(0,0.52,0)` | `(0.62,0.08,0.72)` | Enabled |
+| `LiftColumn` | `(0,0.56,0)` | `(0.16,0.18,0.16)` | Disabled |
+| `LiftPlatform` | 收回位置 `(0,0.69,0)` | `(0.62,0.08,0.72)` | Enabled |
 
 举升参数：
 
@@ -473,7 +504,7 @@ Unity 内置 Plane 原始尺寸约为 `10 m × 10 m`，因此 X/Z 缩放为 2 �
 | 到位容差 | `0.005 m` |
 | 状态发布频率 | `20 Hz` |
 
-伸长量是相对于收回位置的局部 Y 轴位移，而不是平台的世界坐标高度。例如命令 `0.25 m` 会将平台从 Local Y `0.52` 移动到约 `0.77`。
+伸长量是相对于收回位置的局部 Y 轴位移，而不是平台的世界坐标高度。例如命令 `0.25 m` 会将平台从 Local Y `0.69` 移动到约 `0.94`。
 
 #### 灯光与摄像机
 
@@ -493,24 +524,17 @@ Unity 内置 Plane 原始尺寸约为 `10 m × 10 m`，因此 X/Z 缩放为 2 �
 3. 创建 `Chassis` Cube 子对象，设置位置、缩放和蓝色材质，禁用其重复 Collider；
 4. 在根节点添加 Rigidbody，并配置质量、阻尼和重力；
 5. 冻结 X/Z 旋转，防止最小模型侧翻或前后翻滚；
-6. 添加 `RosDifferentialDrive`；
-7. 创建两个 Cylinder 作为车轮并设为底盘子对象；
-8. 将 Cylinder 绕 Z 轴旋转 90°，使轮轴方向与底盘横向一致；
-9. 禁用车轮 Collider，避免视觉轮与底盘 Collider 重复接触地面；
+6. 创建两个 Cylinder 作为车轮外观，将其绕 Z 轴旋转 90°并禁用 CapsuleCollider；
+7. 在相同轮心位置创建 `LeftWheelCollider` 和 `RightWheelCollider`；
+8. 添加 `RosDifferentialDrive`，绑定两个物理轮和两个视觉轮；
+9. 配置轮半径、轮距、悬架、摩擦、最大扭矩和停车制动力；
 10. 创建橙色 Cube 作为前向标志并禁用 Collider；
 11. 创建黄色 `LiftColumn` 和 `LiftPlatform`；
 12. 保留 LiftPlatform Collider，禁用 LiftColumn Collider；
 13. 在根节点添加 `RosLiftController` 并绑定 LiftPlatform；
 14. 添加固定摄像机和方向光。
 
-当前 Rigidbody 的实际位移由 `RosDifferentialDrive` 调用 `MovePosition()` 和 `MoveRotation()` 完成。车轮不会根据左右轮角速度独立旋转，也不会通过摩擦力驱动车体。
-
-采用这一实现的原因：
-
-- 当前里程碑首先验证 Unity 与 ROS 2 的双向通信；
-- 避免把 WheelCollider 调参与 TCP、topic、坐标转换问题混在一起；
-- 运动结果确定，便于检查 `/cmd_vel` 符号和 `/odom` 坐标；
-- 后续可在保持 ROS 接口不变的情况下替换底层驱动实现。
+当前 `RosDifferentialDrive` 不再调用 `Rigidbody.MovePosition()` 或 `MoveRotation()`。机器人位移来自左右 `WheelCollider.motorTorque`、轮地摩擦和 Rigidbody 动力学。该方案是本项目的最小物理差速模型；X/Z 旋转仍被冻结，用来代替尚未建模的万向轮和车身姿态动力学。
 
 ### 6.8 自动生成脚本的执行过程
 
@@ -522,9 +546,10 @@ Ensure Assets/Scenes
   → CreateGround
   → CreateRobot
       → Rigidbody
-      → RosDifferentialDrive
       → Chassis
       → LeftWheel / RightWheel
+      → LeftWheelCollider / RightWheelCollider
+      → RosDifferentialDrive（绑定物理轮与视觉轮）
       → ForwardMarker
       → LiftColumn / LiftPlatform
       → RosLiftController
@@ -550,6 +575,14 @@ Assets/Scenes/MinimalRosRobot.unity
 
 重要：再次运行该菜单会创建一个新的空场景并覆盖同一路径。对该场景进行重要手工修改前，应先提交 Git，或复制为新场景。正式仓库建模阶段应创建新的 `Warehouse.unity`，不要继续覆盖最小联调场景。
 
+如果场景中已经有举升模型或其他手工调整，不要重建场景。退出 Play Mode，执行：
+
+```text
+Warehouse Robotics > Upgrade Current Robot To Physical Wheels
+```
+
+确认 Console 出现升级成功日志后保存场景。该操作支持 Undo，并只处理名为 `DifferentialRobot` 的对象层级。
+
 ### 6.9 手动复现建模步骤
 
 如果 Editor 脚本不可用，可在 Unity 中手动复现：
@@ -557,12 +590,12 @@ Assets/Scenes/MinimalRosRobot.unity
 1. 新建 Empty Scene；
 2. 创建 Plane，缩放为 `(2,1,2)`，命名 `Ground`；
 3. 创建 Empty GameObject，命名 `DifferentialRobot`，保持单位缩放；
-4. 在根节点添加 BoxCollider，Center `(0,0.15,0)`、Size `(0.70,0.30,0.90)`；
-5. 创建 `Chassis` Cube 子对象，Position `(0,0.15,0)`、Scale `(0.70,0.30,0.90)`，禁用其 Collider；
-6. 在根节点添加 Rigidbody，Mass 40，勾选 Freeze Rotation X/Z；
-7. 在根节点添加 `RosDifferentialDrive` 组件；
-8. 在根节点下创建两个 Cylinder，按照 6.6 表格设置左右位置；
-9. 禁用两个 Cylinder 的 Collider；
+4. 在根节点添加 BoxCollider，Center `(0,0.32,0)`、Size `(0.70,0.28,0.90)`；
+5. 创建 `Chassis` Cube 子对象，Position `(0,0.32,0)`、Scale `(0.70,0.28,0.90)`，禁用其 Collider；
+6. 在根节点添加 Rigidbody，Mass 40、Center Of Mass `(0,0.24,0)`，勾选 Freeze Rotation X/Z；
+7. 在根节点下创建两个 Cylinder，按照 6.6 表格设置左右位置并禁用它们的 Collider；
+8. 创建两个空子对象 `LeftWheelCollider`、`RightWheelCollider`，位置与视觉轮相同，各添加半径 `0.18` 的 WheelCollider；
+9. 在根节点添加 `RosDifferentialDrive`，绑定左右物理轮与视觉轮，Wheel Radius 填 `0.18`、Track Width 填 `0.78`；
 10. 创建橙色 Cube 作为 ForwardMarker，禁用 Collider；
 11. 创建 LiftColumn 和 LiftPlatform，并按照 6.6 表格设置参数；
 12. 在根节点添加 `RosLiftController`，将 LiftPlatform 拖入引用字段；
@@ -578,7 +611,9 @@ Assets/Scenes/MinimalRosRobot.unity
 - 机器人静止时不会穿过地面或发生明显抖动；
 - 正 `linear.x` 使机器人沿橙色标志方向移动；
 - 正 `angular.z` 符合 ROS 左转约定；
-- 轮子和方向标志不会产生额外物理碰撞；
+- 左右视觉轮在直行和转向时可见旋转；
+- 视觉轮 Collider 禁用，两个 WheelCollider 接地且 `Is Grounded=true`；
+- 停止命令后电机扭矩归零并施加制动力；
 - 目标伸长量在 `0–0.35 m` 内时，LiftPlatform 可见地上下运动；
 - 运行过程中 Console 无红色错误；
 - 场景保存后重新打开仍保留对象和组件。
@@ -630,25 +665,32 @@ angular.z  偏航角速度，单位 rad/s
 |angular.z| <= 1.5 rad/s
 ```
 
-### 7.2 运动更新
+### 7.2 差速逆运动学
 
-运动在 Unity `FixedUpdate()` 中执行：
+控制器先将 `/cmd_vel` 转换为左右轮目标角速度：
 
 ```text
-位置增量 = robot_forward × linear_velocity × fixed_delta_time
-角度增量 = angular_velocity × fixed_delta_time
+left_target  = (linear - angular × track_width / 2) / wheel_radius
+right_target = (linear + angular × track_width / 2) / wheel_radius
 ```
 
-当前使用：
+当前 `wheel_radius=0.18 m`，`track_width=0.78 m`。例如命令 `linear.x=0.5 m/s`、`angular.z=0` 时，两侧目标角速度均约为 `2.78 rad/s`；原地左转时左轮反转、右轮正转。
 
-```csharp
-Rigidbody.MovePosition(...)
-Rigidbody.MoveRotation(...)
+### 7.3 轮速与刚体动力学
+
+每个 `FixedUpdate()` 使用 WheelCollider 的实测 `rpm` 计算角速度，并用比例轮速控制器生成扭矩：
+
+```text
+measured_angular_speed = rpm × 2π / 60
+motor_torque = clamp(
+    wheel_speed_gain × (target - measured),
+    -maximum_motor_torque,
+    +maximum_motor_torque)
 ```
 
-这是最小联调阶段的运动学实现。优点是确定性较高，能够先证明通信、坐标和 topic 正确。
+两个 WheelCollider 通过轮地摩擦对根节点 Rigidbody 施力。控制器仅设置 `motorTorque` 和 `brakeTorque`，不直接写机器人位姿。视觉轮使用 `WheelCollider.GetWorldPose()` 同步悬架位置和滚动角度。
 
-### 7.3 命令超时
+### 7.4 命令超时与制动
 
 每次收到 `/cmd_vel` 时记录 Unity 时间。若超过 0.5 秒没有新命令：
 
@@ -657,9 +699,9 @@ linear = 0
 angular = 0
 ```
 
-因此终止 `ros2 topic pub` 后，机器人应在 0.5 秒内停止。
+此时两轮 `motorTorque=0`，并施加 `80 N·m` 保持制动力。因此终止 `ros2 topic pub` 后，控制器在 0.5 秒超时时刻开始制动；验收时机器人应在约 1 秒内接近静止。
 
-### 7.4 坐标转换
+### 7.5 坐标转换
 
 ROS 使用 FLU，Unity 使用 RUF：
 
@@ -695,9 +737,8 @@ Child frame: base_link
 
 当前位置相对于启动 Play 时的机器人位姿计算，因此每次重新 Play 后 odometry 从局部原点开始。
 
-当前 `/odom` 使用 Unity ground truth，不模拟：
+当前 `/odom` 的 pose 和 twist 使用 Rigidbody ground truth。轮胎打滑会真实反映为车体未达到命令速度，但输出不模拟：
 
-- 轮胎打滑；
 - 编码器噪声；
 - 累积漂移；
 - 时间同步误差。
@@ -779,7 +820,7 @@ ros2 topic pub --rate 10 /cmd_vel geometry_msgs/msg/Twist \
   "{linear: {x: 0.4}, angular: {z: 0.3}}"
 ```
 
-按 `Ctrl+C` 停止发布。机器人应在 0.5 秒内停止。
+测试时同时观察两只视觉轮：直行时同向滚动，原地转向时反向滚动。按 `Ctrl+C` 停止发布；0.5 秒命令超时后应开始制动，并在约 1 秒内接近静止。
 
 ### 9.5 测试 Unity → ROS 2
 
@@ -795,8 +836,9 @@ ros2 topic echo /odom
 
 - 直行时 `pose.pose.position.x/y` 变化；
 - 转向时 `pose.pose.orientation` 变化；
-- `twist.twist.linear.x` 与命令一致；
-- `twist.twist.angular.z` 与命令一致。
+- `twist.twist.linear.x` 从零逐步接近直行命令，而不是瞬间跳到命令值；
+- `twist.twist.angular.z` 从零逐步接近转向命令；
+- 打滑、加速和制动期间，实测 twist 允许与命令存在差异。
 
 检查频率：
 
@@ -821,6 +863,15 @@ Topics: /cmd_vel, /odom
 ```
 
 这证明 TCP 和 ROS topic 注册已经成功。小车实际运动和 `/odom` 数值变化仍应按 9.4、9.5 进行人工观察确认。
+
+2026-09-10 物理差速轮代码检查：
+
+```text
+Assembly-CSharp:        Build succeeded, 0 warnings, 0 errors
+Assembly-CSharp-Editor: Build succeeded, 0 warnings, 0 errors
+```
+
+该检查证明运行脚本和 Editor 升级工具能够由 Unity 6 工程编译，但不能替代 Play Mode 下的轮地接触、转向方向和参数调优验证。
 
 ---
 
@@ -977,9 +1028,11 @@ ros2 param set /lift_command_node target_height 0.25
 3. `/odom` 有 Unity publisher；
 4. 正线速度使机器人沿橙色标志方向前进；
 5. 正 `angular.z` 的转向与 ROS 约定一致；
-6. 停止发布后 0.5 秒内停车；
-7. `/odom` 频率接近配置值；
-8. Unity Console 无红色错误。
+6. 两个 WheelCollider 均接触地面，视觉轮滚动方向正确；
+7. 停止发布 0.5 秒后进入制动且约 1 秒内接近静止；
+8. `/odom` twist 来源于刚体实测速度，运动初期具有合理加速过程；
+9. `/odom` 频率接近配置值；
+10. Unity Console 无红色错误。
 
 禁止在未完成上述验证时将状态标记为“已完成”。
 
@@ -989,15 +1042,16 @@ ros2 param set /lift_command_node target_height 0.25
 
 在保持当前闭环可运行的前提下，按以下顺序扩展：
 
-1. 验证实际运动方向、角速度符号和 odometry 数值；
-2. 将运动学底盘升级为显式左右轮速度模型；
-3. 添加顶撑和载货状态；
-4. 构建简化仓库场景；
-5. 添加二维雷达；
-6. 添加已知地图和 empty/loaded costmap；
-7. 实现 load-aware A*；
-8. 实现路径跟踪；
-9. 实现取货—运输—放货任务状态机。
+1. 在当前场景执行物理轮升级并完成直行、原地旋转和制动联调；
+2. 调整 WheelCollider 摩擦、悬架和轮速增益，使实测速度稳定；
+3. 完成举升自由度的 Unity 运动与 ROS 反馈验证；
+4. 添加载货连接和载货状态；
+5. 构建简化仓库场景；
+6. 添加二维雷达；
+7. 添加已知地图和 empty/loaded costmap；
+8. 实现 load-aware A*；
+9. 实现路径跟踪；
+10. 实现取货—运输—放货任务状态机。
 
 当前通信闭环在每个阶段都应保持可独立运行。
 
@@ -1020,6 +1074,18 @@ ros2 param set /lift_command_node target_height 0.25
 ---
 
 ## 15. 变更日志
+
+### 2026-09-10 — Milestone 3 物理差速轮实现
+
+- 将底盘从 `MovePosition`/`MoveRotation` 运动学控制改为双 `WheelCollider` 物理驱动；
+- 实现 `/cmd_vel` 到左右轮目标角速度的差速逆运动学；
+- 实现基于 WheelCollider `rpm` 的比例轮速扭矩控制；
+- 增加 45 N·m 扭矩限幅、80 N·m 停车制动、悬架及轮地摩擦参数；
+- 视觉轮通过 `GetWorldPose()` 跟随物理轮滚动；
+- `/odom` twist 改为 Rigidbody 实测线速度和角速度；
+- 新增 `Upgrade Current Robot To Physical Wheels` 菜单，避免覆盖已有场景；
+- Unity 运行与 Editor 工程编译均通过，0 warnings、0 errors；
+- Play Mode 动力学方向、接地状态和参数调优等待场景升级后验证。
 
 ### 2026-09-10 — 补充举升节点启动与 `Node not found` 排障
 
@@ -1209,7 +1275,7 @@ Lift reached 0.250 m (target 0.250 m)
 ### 17.4 联调验证 SOP
 
 1. 在 Unity 等待编译完成，确认 Console 无红色错误；
-2. 执行 `Warehouse Robotics > Build Minimal ROS Robot Scene`；
+2. 现有场景执行 `Warehouse Robotics > Upgrade Current Robot To Physical Wheels`；首次创建场景时才执行 `Build Minimal ROS Robot Scene`；
 3. 打开重新生成的 `MinimalRosRobot.unity`；
 4. 确认 Hierarchy 中包含 `LiftColumn` 和 `LiftPlatform`；
 5. 点击 Play；
@@ -1239,3 +1305,46 @@ ros2 topic echo /lift/at_target
 - 非法参数（如 0.50 m）被 ROS 节点拒绝；
 - 举升过程中底盘仍可响应 `/cmd_vel`；
 - Unity Console 无红色错误。
+
+---
+
+## 18. 物理差速轮升级与验证
+
+### 18.1 升级当前场景
+
+1. 退出 Play Mode；
+2. 等待 Unity 脚本编译完成；
+3. 执行 `Warehouse Robotics > Upgrade Current Robot To Physical Wheels`；
+4. 保存场景；
+5. 展开 `DifferentialRobot`，确认新增 `LeftWheelCollider` 和 `RightWheelCollider`；
+6. 选中机器人，确认 `RosDifferentialDrive` 的四个轮引用均不为空；
+7. 点击 Play，确认 Console 没有 `requires left and right WheelColliders` 错误。
+
+### 18.2 直行验证
+
+```bash
+ros2 topic pub --rate 10 /cmd_vel geometry_msgs/msg/Twist \
+  "{linear: {x: 0.4}, angular: {z: 0.0}}"
+```
+
+验收：左右轮同向滚动，机器人沿橙色标志方向前进；`/odom` 的 `twist.twist.linear.x` 从零逐渐接近 `0.4`，允许因物理阻力存在小偏差。
+
+### 18.3 原地左转验证
+
+```bash
+ros2 topic pub --rate 10 /cmd_vel geometry_msgs/msg/Twist \
+  "{linear: {x: 0.0}, angular: {z: 0.8}}"
+```
+
+验收：左轮反转、右轮正转，机器人按 ROS 正 `angular.z` 原地左转，`/odom` 的 `twist.twist.angular.z` 为正。
+
+### 18.4 制动与接地验证
+
+停止 publisher 后确认：
+
+- 0.5 秒后进入超时制动；
+- 机器人约 1 秒内接近静止；
+- 车身不穿过地面且没有持续高频抖动；
+- 运行中查看两个 WheelCollider 的 `Is Grounded` 均为 true。
+
+若轮子空转但机器人不移动，先检查 WheelCollider 是否接地以及 Ground 是否保留 Collider；若转向方向相反，先核对左右轮引用是否互换，再检查第 7.5 节坐标约定。只有完成以上 Play Mode 验证后，才能将 Milestone 3 标记为已完成。

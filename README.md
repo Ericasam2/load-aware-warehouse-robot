@@ -3,6 +3,20 @@
 Unity–ROS 2 warehouse robotics demonstrator with a ROS-controlled lift and a
 two-wheel physical differential-drive base.
 
+Warehouse environment: open `Assets/Scenes/WarehouseEnvironment.unity` in Unity.
+It contains two under-rack pickup/drop-off passages with low entrances and side
+transfer openings, a 2.4 m high loaded through-rack passage, a movable obstacle,
+and the existing ROS robot. Rebuild with
+`Warehouse Robotics > Build Warehouse Environment`.
+See [warehouse layout, coordinates and limitations](docs/WAREHOUSE_ENVIRONMENT.md).
+
+P1/P2 use [static open-center conveyor lifts](docs/STATIC_CONVEYOR.md): twin
+support tracks leave a continuous slot for robot access, lift lowering and exit.
+
+The robot now has correctly sized drive wheels with rotation markers, a layered
+chassis, and twin telescoping lift columns that follow the existing platform.
+See [functional robot model and validation](docs/ROBOT_MODEL.md).
+
 Internal setup, implementation, verification, and troubleshooting procedures:
 [docs/INTERNAL_SOP.md](docs/INTERNAL_SOP.md).
 

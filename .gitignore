@@ -5,6 +5,9 @@ unity_project/[Oo]bj/
 unity_project/[Ll]ogs/
 unity_project/[Uu]ser[Ss]ettings/
 unity_project/MemoryCaptures/
+unity_project/Assets/_Recovery/
+unity_project/Assets/_Recovery.meta
+unity_project/WarehouseValidation/
 
 # ROS 2 generated files
 ros2_ws/build/

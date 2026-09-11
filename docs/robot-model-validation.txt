@@ -1,0 +1,7 @@
+ROBOT_MODEL_VALIDATION_OK: MinimalRosRobot
+ROBOT_MODEL_VALIDATION_OK: MinimalRosRobot
+ROBOT_MODEL_VALIDATION_OK: WarehouseEnvironment
+ROBOT_MODEL_VALIDATION_OK: WarehouseEnvironment
+ROBOT_WAREHOUSE_FIT_OK: retracted fits both gates and P1; raised blocked by low lintel/static cargo
+ROBOT_MODEL_BUILD_OK: both scenes, wheel diameter, full lift stroke, collider count, idempotency
+[ExitDontLaunchBugReporter] Exiting without the bug reporter. Application will exit with return code 0

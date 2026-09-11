@@ -4,5 +4,11 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/MinimalRosRobot.unity
+    guid: 44b3efb933549ed43a226d0b9dbaf204
+  - enabled: 1
+    path: Assets/Scenes/WarehouseEnvironment.unity
+    guid: b821a824d3e73d1479f9ae499beed302
   m_configObjects: {}

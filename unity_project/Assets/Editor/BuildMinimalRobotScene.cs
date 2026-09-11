@@ -48,6 +48,11 @@ namespace WarehouseRobot.Editor
                 return;
             }
 
+            UpgradeRobot(robot);
+        }
+
+        public static void UpgradeRobot(GameObject robot)
+        {
             Undo.RegisterFullObjectHierarchyUndo(robot, "Upgrade differential-drive wheels");
 
             BoxCollider bodyCollider = robot.GetComponent<BoxCollider>() ??
@@ -90,6 +95,7 @@ namespace WarehouseRobot.Editor
                 WheelRadius,
                 TrackWidth);
 
+            RobotFunctionalModel.Apply(robot);
             EditorUtility.SetDirty(robot);
             EditorUtility.SetDirty(drive);
             EditorSceneManager.MarkSceneDirty(robot.scene);
@@ -176,6 +182,7 @@ namespace WarehouseRobot.Editor
             Transform liftPlatform = CreateLift(robot.transform);
             RosLiftController liftController = robot.AddComponent<RosLiftController>();
             liftController.Configure(liftPlatform);
+            RobotFunctionalModel.Apply(robot);
         }
 
         private static Transform CreateWheelVisual(
@@ -189,7 +196,7 @@ namespace WarehouseRobot.Editor
             wheel.transform.SetParent(parent, false);
             wheel.transform.localPosition = localPosition;
             wheel.transform.localRotation = Quaternion.Euler(0.0f, 0.0f, 90.0f);
-            wheel.transform.localScale = new Vector3(radius, 0.08f, radius);
+            wheel.transform.localScale = new Vector3(radius * 2, 0.08f, radius * 2);
             wheel.GetComponent<Collider>().enabled = false;
             wheel.GetComponent<Renderer>().sharedMaterial =
                 CreateMaterial("WheelMaterial", new Color(0.04f, 0.04f, 0.04f));
@@ -235,7 +242,7 @@ namespace WarehouseRobot.Editor
 
             visual.localPosition = localPosition;
             visual.localRotation = Quaternion.Euler(0.0f, 0.0f, 90.0f);
-            visual.localScale = new Vector3(WheelRadius, 0.08f, WheelRadius);
+            visual.localScale = new Vector3(WheelRadius * 2, 0.08f, WheelRadius * 2);
             Collider visualCollider = visual.GetComponent<Collider>();
             if (visualCollider != null)
             {

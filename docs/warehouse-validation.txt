@@ -1,0 +1,6 @@
+RACK_PASSAGES_OK: 61 longitudinal samples, low entry blocks raised robot, 36 pickup lift samples, 51 raised lateral-transfer samples
+CONVEYOR_DEPOSIT_OK: P2 loaded approach, lowering, empty withdrawal; 153 poses; two static conveyors
+CONVEYOR_SUPPORT_OK: both static track contact surfaces at 0.82 m
+WAREHOUSE_VALIDATION_OK: spawn, wheels, full-length under-rack passages
+WAREHOUSE_BUILD_OK: Assets/Scenes/WarehouseEnvironment.unity
+[ExitDontLaunchBugReporter] Exiting without the bug reporter. Application will exit with return code 0

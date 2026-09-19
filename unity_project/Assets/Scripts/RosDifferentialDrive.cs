@@ -66,6 +66,9 @@ namespace WarehouseRobot
         private double rightWheelPosition;
         private Vector3 startPosition;
         private Quaternion startRotation;
+        private float nextDiagnosticTime;
+        private float leftIntegralTorque;
+        private float rightIntegralTorque;
 
         /// <summary>
         /// Connects the scene-generated physical wheels to this controller.
@@ -141,8 +144,17 @@ namespace WarehouseRobot
             float leftMeasuredAngularSpeed = GetWheelAngularSpeed(leftWheelCollider);
             float rightMeasuredAngularSpeed = GetWheelAngularSpeed(rightWheelCollider);
 
-            DriveWheel(leftWheelCollider, leftTargetAngularSpeed, leftMeasuredAngularSpeed);
-            DriveWheel(rightWheelCollider, rightTargetAngularSpeed, rightMeasuredAngularSpeed);
+            // Ground-speed feedback avoids the WheelCollider low-speed RPM/slip
+            // discontinuity during counter-rotation. Encoders still report RPM.
+            float leftGroundSpeed = Vector3.Dot(robotBody.GetPointVelocity(leftWheelCollider.transform.position), transform.forward) / wheelRadius;
+            float rightGroundSpeed = Vector3.Dot(robotBody.GetPointVelocity(rightWheelCollider.transform.position), transform.forward) / wheelRadius;
+            DriveWheel(leftWheelCollider, leftTargetAngularSpeed, leftGroundSpeed, ref leftIntegralTorque);
+            DriveWheel(rightWheelCollider, rightTargetAngularSpeed, rightGroundSpeed, ref rightIntegralTorque);
+            if (Application.isBatchMode && Time.time >= nextDiagnosticTime)
+            {
+                nextDiagnosticTime = Time.time + 2.0f;
+                Debug.Log($"Drive cmd=({linear:F3},{angular:F3}) wheel_rad_s=({leftMeasuredAngularSpeed:F3},{rightMeasuredAngularSpeed:F3}) torque=({leftWheelCollider.motorTorque:F3},{rightWheelCollider.motorTorque:F3}) grounded=({leftWheelCollider.isGrounded},{rightWheelCollider.isGrounded})");
+            }
             UpdateWheelVisual(leftWheelCollider, leftWheelVisual);
             UpdateWheelVisual(rightWheelCollider, rightWheelVisual);
 
@@ -172,19 +184,30 @@ namespace WarehouseRobot
         private void DriveWheel(
             WheelCollider wheel,
             float targetAngularSpeed,
-            float measuredAngularSpeed)
+            float measuredAngularSpeed,
+            ref float integralTorque)
         {
             if (Mathf.Abs(targetAngularSpeed) <= stoppedSpeedTolerance)
             {
                 wheel.motorTorque = 0.0f;
                 wheel.brakeTorque = holdingBrakeTorque;
+                integralTorque = 0.0f;
                 return;
             }
 
             float speedError = targetAngularSpeed - measuredAngularSpeed;
             wheel.brakeTorque = 0.0f;
+            // Each drive supports half the chassis mass. Bound the discrete
+            // ground-speed loop by its effective inertia and physics time step.
+            float inertia = 0.5f * robotBody.mass * wheelRadius * wheelRadius;
+            float stableGain = Mathf.Min(wheelSpeedGain, 0.5f * inertia / Time.fixedDeltaTime);
+            float candidateIntegral = integralTorque + 2.0f * speedError * Time.fixedDeltaTime;
+            float candidateTorque = stableGain * speedError + candidateIntegral;
+            if (Mathf.Abs(candidateTorque) <= maximumMotorTorque ||
+                Mathf.Sign(speedError) != Mathf.Sign(candidateTorque))
+                integralTorque = Mathf.Clamp(candidateIntegral, -maximumMotorTorque, maximumMotorTorque);
             wheel.motorTorque = Mathf.Clamp(
-                wheelSpeedGain * speedError,
+                stableGain * speedError + integralTorque,
                 -maximumMotorTorque,
                 maximumMotorTorque);
         }

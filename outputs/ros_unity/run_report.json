@@ -1,0 +1,20 @@
+{
+  "status": "SUCCESS",
+  "passed": true,
+  "recorded_at_utc": "2026-09-19T12:10:24.343304+00:00",
+  "elapsed_s": 76.580449079,
+  "samples": 1466,
+  "final_map_pose": [
+    2.0109329223632812,
+    5.02175235748291,
+    -1.5714266300201416
+  ],
+  "goal": [
+    2.012500000000001,
+    5.012500000000001,
+    4.71238898038469
+  ],
+  "position_error_m": 0.009384127626532538,
+  "yaw_error_rad": 0.0006303032252450436,
+  "verification": "ROS odometry feedback; sampled footprint checks, not contact-sensor proof"
+}

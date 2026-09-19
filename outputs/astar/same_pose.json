@@ -1,0 +1,46 @@
+{
+  "status": "SUCCESS",
+  "states": [
+    [
+      120,
+      680,
+      0
+    ]
+  ],
+  "poses": [
+    [
+      -5.9875,
+      7.012499999999999,
+      0.0
+    ]
+  ],
+  "segments": [],
+  "cost": 0.0,
+  "length_m": 0.0,
+  "reverse_length_m": 0.0,
+  "turn_steps": 0,
+  "elapsed_s": 4.3100000084450585e-05,
+  "expansions": 0,
+  "mode": "empty",
+  "frame": "map",
+  "requested_start": [
+    -6.0,
+    7.0,
+    0.0
+  ],
+  "requested_goal": [
+    -6.0,
+    7.0,
+    0.0
+  ],
+  "scene_profile": "initial",
+  "overrides": null,
+  "source_scene_sha256": "2b0d475d3ee2a6afb8395dde238e1a1769c073bc595d6f78cbab2ef2b99f7242",
+  "verification": {
+    "passed": true,
+    "sampled_poses": 2,
+    "translation_step_max_m": 0.0125,
+    "rotation_step_max_deg": 2,
+    "checked_margin_m": 0.02
+  }
+}

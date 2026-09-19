@@ -1,0 +1,159 @@
+{
+  "all_passed": true,
+  "detour_longer_than_clear_route": true,
+  "source_scene_sha256": "2b0d475d3ee2a6afb8395dde238e1a1769c073bc595d6f78cbab2ef2b99f7242",
+  "cases": [
+    {
+      "case": "start_to_pickup",
+      "expected": "SUCCESS",
+      "passed": true,
+      "status": "SUCCESS",
+      "cost": 10.30142135623738,
+      "length_m": 9.94142135623731,
+      "reverse_length_m": 0.0,
+      "turn_steps": 2,
+      "elapsed_s": 1.9551279999998314,
+      "expansions": 367968,
+      "verification": {
+        "passed": true,
+        "sampled_poses": 1500,
+        "translation_step_max_m": 0.0125,
+        "rotation_step_max_deg": 2,
+        "checked_margin_m": 0.02
+      }
+    },
+    {
+      "case": "pickup_to_dropoff",
+      "expected": "SUCCESS",
+      "passed": true,
+      "status": "SUCCESS",
+      "cost": 5.0000000000000036,
+      "length_m": 5.0,
+      "reverse_length_m": 0.0,
+      "turn_steps": 0,
+      "elapsed_s": 0.0007372000000032131,
+      "expansions": 200,
+      "verification": {
+        "passed": true,
+        "sampled_poses": 760,
+        "translation_step_max_m": 0.0125,
+        "rotation_step_max_deg": 2,
+        "checked_margin_m": 0.02
+      }
+    },
+    {
+      "case": "empty_low_passage",
+      "expected": "SUCCESS",
+      "passed": true,
+      "status": "SUCCESS",
+      "cost": 6.000000000000018,
+      "length_m": 6.0,
+      "reverse_length_m": 0.0,
+      "turn_steps": 0,
+      "elapsed_s": 0.001193399999920075,
+      "expansions": 240,
+      "verification": {
+        "passed": true,
+        "sampled_poses": 912,
+        "translation_step_max_m": 0.0125,
+        "rotation_step_max_deg": 2,
+        "checked_margin_m": 0.02
+      }
+    },
+    {
+      "case": "loaded_high_passage",
+      "expected": "SUCCESS",
+      "passed": true,
+      "status": "SUCCESS",
+      "cost": 6.000000000000018,
+      "length_m": 6.0,
+      "reverse_length_m": 0.0,
+      "turn_steps": 0,
+      "elapsed_s": 0.001040800000055242,
+      "expansions": 240,
+      "verification": {
+        "passed": true,
+        "sampled_poses": 912,
+        "translation_step_max_m": 0.0125,
+        "rotation_step_max_deg": 2,
+        "checked_margin_m": 0.02
+      }
+    },
+    {
+      "case": "raised_high_passage",
+      "expected": "SUCCESS",
+      "passed": true,
+      "status": "SUCCESS",
+      "cost": 6.000000000000018,
+      "length_m": 6.0,
+      "reverse_length_m": 0.0,
+      "turn_steps": 0,
+      "elapsed_s": 0.0013719999999466381,
+      "expansions": 240,
+      "verification": {
+        "passed": true,
+        "sampled_poses": 912,
+        "translation_step_max_m": 0.0125,
+        "rotation_step_max_deg": 2,
+        "checked_margin_m": 0.02
+      }
+    },
+    {
+      "case": "loaded_detour",
+      "expected": "SUCCESS",
+      "passed": true,
+      "status": "SUCCESS",
+      "cost": 11.196066017178063,
+      "length_m": 9.75606601717798,
+      "reverse_length_m": 0.0,
+      "turn_steps": 8,
+      "elapsed_s": 1.4285327000000052,
+      "expansions": 292191,
+      "verification": {
+        "passed": true,
+        "sampled_poses": 1642,
+        "translation_step_max_m": 0.0125,
+        "rotation_step_max_deg": 2,
+        "checked_margin_m": 0.02
+      }
+    },
+    {
+      "case": "unreachable",
+      "expected": "UNREACHABLE",
+      "passed": true,
+      "status": "UNREACHABLE"
+    },
+    {
+      "case": "blocked_goal",
+      "expected": "GOAL_BLOCKED",
+      "passed": true,
+      "status": "GOAL_BLOCKED"
+    },
+    {
+      "case": "outside_goal",
+      "expected": "OUT_OF_BOUNDS",
+      "passed": true,
+      "status": "OUT_OF_BOUNDS"
+    },
+    {
+      "case": "same_pose",
+      "expected": "SUCCESS",
+      "passed": true,
+      "status": "SUCCESS",
+      "cost": 0.0,
+      "length_m": 0.0,
+      "reverse_length_m": 0.0,
+      "turn_steps": 0,
+      "elapsed_s": 4.3100000084450585e-05,
+      "expansions": 0,
+      "verification": {
+        "passed": true,
+        "sampled_poses": 2,
+        "translation_step_max_m": 0.0125,
+        "rotation_step_max_deg": 2,
+        "checked_margin_m": 0.02
+      }
+    }
+  ],
+  "scope": "Offline A* and independent geometric checks, not Unity physics or ROS execution"
+}

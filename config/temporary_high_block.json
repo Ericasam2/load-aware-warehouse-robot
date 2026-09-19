@@ -1,0 +1,12 @@
+{
+  "disabled_ids": [],
+  "additional": [
+    {
+      "id": "scenario/high_passage_barrier",
+      "name": "HighPassageBarrier",
+      "kind": "temporary",
+      "min": [1.85, -6.0, 0.0],
+      "max": [2.15, -4.0, 2.4]
+    }
+  ]
+}

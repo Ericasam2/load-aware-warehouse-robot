@@ -1,0 +1,206 @@
+{
+  "paths": {
+    "start_to_pickup": {
+      "status": "SUCCESS",
+      "segments": [
+        {
+          "action": "forward",
+          "start": [
+            -5.9875,
+            7.012499999999999,
+            0.0
+          ],
+          "end": [
+            1.9125000000000014,
+            7.012499999999999,
+            0.0
+          ],
+          "length_m": 7.900000000000001
+        },
+        {
+          "action": "turn_right",
+          "start": [
+            1.9125000000000014,
+            7.012499999999999,
+            0.0
+          ],
+          "end": [
+            1.9125000000000014,
+            7.012499999999999,
+            5.497787143782138
+          ],
+          "length_m": 0.0
+        },
+        {
+          "action": "forward",
+          "start": [
+            1.9125000000000014,
+            7.012499999999999,
+            5.497787143782138
+          ],
+          "end": [
+            2.012500000000001,
+            6.912500000000001,
+            5.497787143782138
+          ],
+          "length_m": 0.14142135623730773
+        },
+        {
+          "action": "turn_right",
+          "start": [
+            2.012500000000001,
+            6.912500000000001,
+            5.497787143782138
+          ],
+          "end": [
+            2.012500000000001,
+            6.912500000000001,
+            4.71238898038469
+          ],
+          "length_m": 0.0
+        },
+        {
+          "action": "forward",
+          "start": [
+            2.012500000000001,
+            6.912500000000001,
+            4.71238898038469
+          ],
+          "end": [
+            2.012500000000001,
+            5.012500000000001,
+            4.71238898038469
+          ],
+          "length_m": 1.9000000000000004
+        }
+      ],
+      "cost": 10.30142135623738,
+      "length_m": 9.94142135623731,
+      "reverse_length_m": 0.0,
+      "turn_steps": 2,
+      "elapsed_s": 1.6583192000016425,
+      "expansions": 367968,
+      "mode": "empty",
+      "requested_start": [
+        -6.0,
+        7.0,
+        0.0
+      ],
+      "requested_goal": [
+        2.0,
+        5.0,
+        -1.5707963705062866
+      ]
+    },
+    "pickup_to_dropoff": {
+      "status": "SUCCESS",
+      "segments": [
+        {
+          "action": "forward",
+          "start": [
+            2.012500000000001,
+            5.012500000000001,
+            4.71238898038469
+          ],
+          "end": [
+            2.012500000000001,
+            0.012500000000001066,
+            4.71238898038469
+          ],
+          "length_m": 5.0
+        }
+      ],
+      "cost": 5.0000000000000036,
+      "length_m": 5.0,
+      "reverse_length_m": 0.0,
+      "turn_steps": 0,
+      "elapsed_s": 0.0007256000008055707,
+      "expansions": 200,
+      "mode": "loaded",
+      "requested_start": [
+        2.0,
+        5.0,
+        -1.5707963705062866
+      ],
+      "requested_goal": [
+        2.0,
+        0.0,
+        -1.5707963705062866
+      ]
+    },
+    "empty_low_passage": {
+      "status": "SUCCESS",
+      "segments": [
+        {
+          "action": "forward",
+          "start": [
+            -0.9874999999999989,
+            5.012500000000001,
+            0.0
+          ],
+          "end": [
+            5.012500000000001,
+            5.012500000000001,
+            0.0
+          ],
+          "length_m": 6.0
+        }
+      ],
+      "cost": 6.000000000000018,
+      "length_m": 6.0,
+      "reverse_length_m": 0.0,
+      "turn_steps": 0,
+      "elapsed_s": 0.0011973000000580214,
+      "expansions": 240,
+      "mode": "empty",
+      "requested_start": [
+        -1,
+        5,
+        0
+      ],
+      "requested_goal": [
+        5,
+        5,
+        0
+      ]
+    },
+    "loaded_high_passage": {
+      "status": "SUCCESS",
+      "segments": [
+        {
+          "action": "forward",
+          "start": [
+            -0.9874999999999989,
+            -4.9875,
+            0.0
+          ],
+          "end": [
+            5.012500000000001,
+            -4.9875,
+            0.0
+          ],
+          "length_m": 6.0
+        }
+      ],
+      "cost": 6.000000000000018,
+      "length_m": 6.0,
+      "reverse_length_m": 0.0,
+      "turn_steps": 0,
+      "elapsed_s": 0.000955400000748341,
+      "expansions": 240,
+      "mode": "loaded",
+      "requested_start": [
+        -1,
+        -5,
+        0
+      ],
+      "requested_goal": [
+        5,
+        -5,
+        0
+      ]
+    }
+  },
+  "failures": {},
+  "scope": "Offline geometric planning only; no commands sent; payload carrying profile assumes external attachment confirmation"
+}

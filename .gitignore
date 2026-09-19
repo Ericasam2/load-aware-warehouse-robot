@@ -24,5 +24,8 @@ ros2_ws/log/
 Thumbs.db
 
 # Python generated files
+outputs/map-refresh/
+outputs/doc-intro-qa/
+outputs/ros-unity-editor.log
 __pycache__/
 *.py[cod]

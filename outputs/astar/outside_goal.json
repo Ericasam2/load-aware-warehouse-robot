@@ -1,0 +1,17 @@
+{
+  "status": "OUT_OF_BOUNDS",
+  "message": "pose outside map",
+  "mode": "empty",
+  "requested_start": [
+    -6.0,
+    7.0,
+    0.0
+  ],
+  "requested_goal": [
+    10,
+    0,
+    0
+  ],
+  "poses": [],
+  "segments": []
+}

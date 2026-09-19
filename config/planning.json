@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "frame": "map",
+  "resolution": 0.025,
+  "safety_margin": 0.02,
+  "heading_count": 8,
+  "robot": {
+    "name": "DifferentialRobot",
+    "mass_kg": 40,
+    "wheel_radius": 0.18,
+    "track_width": 0.78,
+    "lift_extension": [0.0, 0.35],
+    "motion": "differential_drive_forward_reverse_and_in_place_rotation",
+    "payload_mount": "length 1.70 along robot forward, width 1.40 lateral; matches stored pallet when docking at map yaw -pi/2",
+    "topics": {"velocity": "/cmd_vel", "odometry": "/odom", "lift": "/lift/command"}
+  },
+  "modes": {
+    "empty": {
+      "scene_profile": "initial",
+      "layers": [
+        {"name": "base_and_wheels", "length": 0.90, "width": 0.956, "bottom": 0.02, "top": 0.46},
+        {"name": "retracted_lift", "length": 0.72, "width": 0.62, "bottom": 0.46, "top": 0.734}
+      ]
+    },
+    "raised_empty": {
+      "scene_profile": "initial",
+      "layers": [
+        {"name": "base_and_wheels", "length": 0.90, "width": 0.956, "bottom": 0.02, "top": 0.46},
+        {"name": "raised_lift", "length": 0.72, "width": 0.62, "bottom": 0.46, "top": 1.084}
+      ]
+    },
+    "loaded": {
+      "scene_profile": "carrying",
+      "layers": [
+        {"name": "base_and_wheels", "length": 0.90, "width": 0.956, "bottom": 0.02, "top": 0.46},
+        {"name": "raised_lift", "length": 0.72, "width": 0.62, "bottom": 0.46, "top": 1.084},
+        {"name": "payload", "length": 1.70, "width": 1.40, "bottom": 1.084, "top": 1.804}
+      ]
+    }
+  },
+  "docking": {
+    "yaw": -1.5707963267948966,
+    "position_tolerance": 0.05,
+    "yaw_tolerance": 0.0872664626,
+    "max_speed": 0.10,
+    "support_height": 0.82,
+    "slot_width": 1.12,
+    "track_length": 3.60,
+    "forbid_rotation_in_slot": true,
+    "rule": "Align outside the slot; drive forward/reverse along map Y; do not turn in the slot"
+  },
+  "transitions": [
+    {"at": "Pickup_P1", "from": "empty", "to": "loaded", "requires": "confirmed_payload_attachment"},
+    {"at": "Dropoff_P2", "from": "loaded", "to": "empty", "requires": "confirmed_payload_release_and_delivered_scene_profile"}
+  ]
+}

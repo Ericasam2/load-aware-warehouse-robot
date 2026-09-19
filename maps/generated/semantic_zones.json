@@ -1,0 +1,93 @@
+{
+  "frame": "map",
+  "zones": [
+    {
+      "id": "WarehouseEnvironment/P1_PICKUP_RACK[5]/LowClearanceCrossbeam[10]",
+      "kind": "LOW_CLEARANCE",
+      "min_xy": [
+        -0.11999999731779099,
+        4.0
+      ],
+      "max_xy": [
+        0.11999999731779099,
+        6.0
+      ],
+      "clearance": 1.0
+    },
+    {
+      "id": "WarehouseEnvironment/P1_PICKUP_RACK[5]/LowClearanceCrossbeam[11]",
+      "kind": "LOW_CLEARANCE",
+      "min_xy": [
+        3.880000114440918,
+        4.0
+      ],
+      "max_xy": [
+        4.119999885559082,
+        6.0
+      ],
+      "clearance": 1.0
+    },
+    {
+      "id": "WarehouseEnvironment/P2_DROPOFF_RACK[6]/LowClearanceCrossbeam[10]",
+      "kind": "LOW_CLEARANCE",
+      "min_xy": [
+        -0.11999999731779099,
+        -1.0
+      ],
+      "max_xy": [
+        0.11999999731779099,
+        1.0
+      ],
+      "clearance": 1.0
+    },
+    {
+      "id": "WarehouseEnvironment/P2_DROPOFF_RACK[6]/LowClearanceCrossbeam[11]",
+      "kind": "LOW_CLEARANCE",
+      "min_xy": [
+        3.880000114440918,
+        -1.0
+      ],
+      "max_xy": [
+        4.119999885559082,
+        1.0
+      ],
+      "clearance": 1.0
+    },
+    {
+      "id": "WarehouseEnvironment/HIGH_THROUGH_RACK[7]/OverheadStorageDeck[4]",
+      "kind": "HIGH_CLEARANCE",
+      "min_xy": [
+        0.11999988555908203,
+        -6.0
+      ],
+      "max_xy": [
+        3.880000114440918,
+        -4.0
+      ],
+      "clearance": 2.4000000953674316
+    },
+    {
+      "id": "Pickup_P1",
+      "kind": "PICKUP_ZONE",
+      "centre": [
+        2.0,
+        5.0
+      ],
+      "yaw": -1.5707963267948966,
+      "slot_width": 1.12,
+      "support_height": 0.82
+    },
+    {
+      "id": "Dropoff_P2",
+      "kind": "DROPOFF_ZONE",
+      "centre": [
+        2.0,
+        0.0
+      ],
+      "yaw": -1.5707963267948966,
+      "slot_width": 1.12,
+      "support_height": 0.82
+    }
+  ],
+  "note": "Display/mission labels only; collision truth comes from exported 3D solids"
+}

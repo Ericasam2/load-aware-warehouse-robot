@@ -1,5 +1,25 @@
 # Load-Aware Warehouse Robot
 
+Pure Python animated simulation (no Unity/ROS): run
+`python -m warehouse_planning.animation --show`, adding `--scenario detour` for the
+loaded obstacle scenario. Includes search replay, robot animation and GIF export.
+See [Python simulation guide](docs/PYTHON_SIMULATION.md).
+
+ROS–Unity closed-loop A* test: run `tools/Run-RosUnityTest.ps1 -PrepareOnly`,
+open `WarehouseEnvironment` in Unity and press Play, then run
+`tools/Run-RosUnityTest.ps1`. See the [joint test SOP](docs/ROS_UNITY_TEST.md).
+The empty start-to-P1 route has passed a ROS 2 + Unity WheelCollider physics run.
+
+Run `tools/Run-AStar.ps1` to plan to pickup, or `tools/Run-AStar.ps1 -Verify`
+for the warehouse scenario suite. The planner supports heading-aware forward,
+reverse and turn actions, obstacle replanning and independent collision checks.
+See [A* planner and results](docs/ASTAR_PLANNER.md).
+
+Height- and heading-aware A* simulation maps are available in `maps/generated`.
+They are exported from the saved Unity warehouse colliders, with robot modes,
+obstacles, pickup/drop-off poses and a reference planner. Run
+`tools/Build-PlanningMap.ps1 -RunTests`; see [planning map usage](docs/PLANNING_MAP.md).
+
 Unity–ROS 2 warehouse robotics demonstrator with a ROS-controlled lift and a
 two-wheel physical differential-drive base.
 
@@ -20,7 +40,14 @@ See [functional robot model and validation](docs/ROBOT_MODEL.md).
 Internal setup, implementation, verification, and troubleshooting procedures:
 [docs/INTERNAL_SOP.md](docs/INTERNAL_SOP.md).
 
-## Current milestone: physical differential-drive integration
+## Current milestone: load-aware planning and ROS–Unity path execution
+
+As of 2026-09-19, the Unity warehouse, physical differential-drive base,
+ROS-controlled lift, height/heading-aware planning maps and load-aware A* are
+implemented. The empty `RobotStart → Pickup_P1` route has also completed a
+closed-loop ROS 2 + Unity WheelCollider run. The remaining MVP work is dynamic
+payload attach/detach, loaded P1 → P2 execution, mission orchestration and lidar
+stop/replanning.
 
 ### ROS side
 

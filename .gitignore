@@ -25,6 +25,10 @@ Thumbs.db
 
 # Python generated files
 outputs/map-refresh/
+outputs/demo_dependencies/
+outputs/unity-basic/project/
+outputs/unity-basic/frames/
+outputs/unity-basic/*.log
 outputs/doc-intro-qa/
 outputs/ros-unity-editor.log
 __pycache__/

@@ -4071,7 +4071,7 @@
     "length_m": 9.94142135623731,
     "reverse_length_m": 0.0,
     "turn_steps": 2,
-    "elapsed_s": 1.6583192000016425,
+    "elapsed_s": 2.0043190000000095,
     "expansions": 367968,
     "mode": "empty",
     "requested_start": [
@@ -6121,7 +6121,7 @@
     "length_m": 5.0,
     "reverse_length_m": 0.0,
     "turn_steps": 0,
-    "elapsed_s": 0.0007256000008055707,
+    "elapsed_s": 0.0008274000000483284,
     "expansions": 200,
     "mode": "loaded",
     "requested_start": [
@@ -8571,7 +8571,7 @@
     "length_m": 6.0,
     "reverse_length_m": 0.0,
     "turn_steps": 0,
-    "elapsed_s": 0.0011973000000580214,
+    "elapsed_s": 0.0013704000000416272,
     "expansions": 240,
     "mode": "empty",
     "requested_start": [
@@ -11021,7 +11021,7 @@
     "length_m": 6.0,
     "reverse_length_m": 0.0,
     "turn_steps": 0,
-    "elapsed_s": 0.000955400000748341,
+    "elapsed_s": 0.0011381000000483255,
     "expansions": 240,
     "mode": "loaded",
     "requested_start": [

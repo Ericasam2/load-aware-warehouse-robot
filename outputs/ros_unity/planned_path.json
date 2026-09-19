@@ -4070,7 +4070,7 @@
   "length_m": 9.94142135623731,
   "reverse_length_m": 0.0,
   "turn_steps": 2,
-  "elapsed_s": 2.121645141999977,
+  "elapsed_s": 2.1967087350000156,
   "expansions": 367968,
   "mode": "empty",
   "frame": "map",
@@ -4086,7 +4086,7 @@
   ],
   "scene_profile": "initial",
   "overrides": null,
-  "source_scene_sha256": "2b0d475d3ee2a6afb8395dde238e1a1769c073bc595d6f78cbab2ef2b99f7242",
+  "source_scene_sha256": "c1dea22796a5572cb45088930893eddbae1fd1db2cc9c0801e5f55290d3fbd66",
   "verification": {
     "passed": true,
     "sampled_poses": 1500,

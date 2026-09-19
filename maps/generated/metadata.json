@@ -21,7 +21,7 @@
   ],
   "blocked_value": true,
   "safety_margin": 0.02,
-  "source_scene_sha256": "2b0d475d3ee2a6afb8395dde238e1a1769c073bc595d6f78cbab2ef2b99f7242",
+  "source_scene_sha256": "c1dea22796a5572cb45088930893eddbae1fd1db2cc9c0801e5f55290d3fbd66",
   "config_sha256": "6508a0d4005790ecf030a2c3992e2a481d0d84a267e7e89e69b37e3e00a1964a",
   "map_from_odom": [
     -6.0,

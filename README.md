@@ -18,6 +18,6 @@ This is a recording from Unity. ROS 2 guides the empty robot from its starting p
 
 ### Finding a detour while carrying a load
 
-This Python simulation shows A* searching for a path, followed by 2D and 3D views of a loaded robot going around an obstacle. It demonstrates the planning algorithm; it is not a Unity recording.
+This 2D Python simulation shows A* searching for a path and a loaded robot going around an obstacle. It demonstrates the planning algorithm; it is not a Unity recording.
 
-![Python A star loaded robot detour](outputs/demo_showcase/02_loaded_detour.gif)
+![Python A star loaded robot detour in 2D](outputs/python_sim/detour/simulation.gif)
